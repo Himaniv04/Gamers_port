@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+*{
+  font-family: "Orbitron", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: normal;
+  font-style: normal;
+}
+
+.gaming-font  {
+  font-family: "Pixelify Sans", sans-serif;
+  font-optical-sizing:auto;
+  font-weight: normal;
+  font-style: normal;
+}
