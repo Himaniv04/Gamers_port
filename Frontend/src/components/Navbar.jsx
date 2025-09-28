@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate, useLocation } from "react-router-dom"; // ✅ Add these imports
+import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/logo.png";
 
 const navItems = [
@@ -15,47 +15,53 @@ const Navbar = ({ scroll }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [visible, setVisible] = useState(true);
   const lastScrollY = useRef(0);
-  const navigate = useNavigate(); // ✅ Add navigate hook
-  const location = useLocation(); // ✅ Add location hook
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Updated scroll function
-  const handleScroll = (to) => {
-    // ✅ If we're not on home page, navigate to home first
+  // Handle navigation for different buttons
+  const handleNavigation = (to, label) => {
+    // Close mobile menu
+    setIsOpen(false);
+
+    // If GALLERY button clicked, navigate to GalleryTab
+    if (label === "GALLERY") {
+      navigate('/gallery-tab');
+      return;
+    }
+
+    // For other buttons, handle section scrolling
     if (location.pathname !== '/') {
+      // If not on home page, navigate to home first
       navigate('/');
-      // Wait for navigation to complete, then scroll
       setTimeout(() => {
         const element = document.getElementById(to);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      }, 100);
-      setIsOpen(false);
+      }, 200);
       return;
     }
 
-    // ✅ If we're on home page, use locomotive scroll
-    if (!scroll) {
+    // If on home page, scroll to section
+    if (scroll) {
+      const element = document.getElementById(to);
+      if (element) {
+        scroll.scrollTo(element, {
+          offset: -70,
+          duration: 1000,
+          easing: [0.25, 0, 0.35, 1],
+        });
+      }
+    } else {
+      // Fallback to native scroll
       const element = document.getElementById(to);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      setIsOpen(false);
-      return;
-    }
-
-    const element = document.getElementById(to);
-    if (element) {
-      scroll.scrollTo(element, {
-        offset: -70,
-        duration: 1000,
-        easing: [0.25, 0, 0.35, 1],
-      });
-      setIsOpen(false);
     }
   };
 
-  // Hide/show navbar based on scroll
+  // Hide/show navbar based on scroll (only on home page)
   useEffect(() => {
     if (!scroll || location.pathname !== '/') return;
 
@@ -93,7 +99,7 @@ const Navbar = ({ scroll }) => {
       variants={navbarVariants}
     >
       {/* Logo */}
-      <div className="logo text-white">
+      <div className="logo text-white cursor-pointer" onClick={() => navigate('/')}>
         <img src={logo} alt="Logo" className="h-12" />
       </div>
 
@@ -102,11 +108,11 @@ const Navbar = ({ scroll }) => {
         {navItems.map((item, index) => (
           <span key={index} className={`relative group ${index === 3 ? "ml-32" : ""}`}>
             <button
-              onClick={() => handleScroll(item.to)}
-              className={`text-lg font-light ${
+              onClick={() => handleNavigation(item.to, item.label)}
+              className={`text-lg font-light transition-all duration-300 ${
                 index === 3
-                  ? "border border-[#00F7FF] px-6  rounded-lg text-cyan-300 hover:bg-cyan-300 hover:text-gray-900 transition-all duration-300"
-                  : "text-cyan-300 hover:text-cyan-300"
+                  ? "border border-[#00F7FF] px-6 rounded-lg text-cyan-300 hover:bg-cyan-300 hover:text-gray-900"
+                  : "text-cyan-300 hover:text-white"
               }`}
             >
               {item.label}
@@ -120,18 +126,20 @@ const Navbar = ({ scroll }) => {
 
       {/* Mobile Menu Icon */}
       <div className="md:hidden text-[#00F7FF]">
-        {isOpen ? (
-          <X className="w-7 h-7 cursor-pointer" onClick={() => setIsOpen(false)} />
-        ) : (
-          <Menu className="w-7 h-7 cursor-pointer" onClick={() => setIsOpen(true)} />
-        )}
+        <button onClick={() => setIsOpen(!isOpen)}>
+          {isOpen ? (
+            <X className="w-7 h-7" />
+          ) : (
+            <Menu className="w-7 h-7" />
+          )}
+        </button>
       </div>
 
       {/* Mobile Menu */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="md:hidden fixed top-[64px] left-0 w-full bg-gray-900 text-[#00F7FF] flex flex-col items-center gap-6 py-6 z-[998] font-['Neue Montreal']"
+            className="md:hidden fixed top-[64px] left-0 w-full bg-gray-900/95 text-[#00F7FF] flex flex-col items-center gap-6 py-6 z-[998] font-['Neue Montreal'] backdrop-blur-sm"
             initial="hidden"
             animate="visible"
             exit="hidden"
@@ -140,11 +148,11 @@ const Navbar = ({ scroll }) => {
             {navItems.map((item, index) => (
               <button
                 key={index}
-                onClick={() => handleScroll(item.to)}
-                className={`text-lg ${
+                onClick={() => handleNavigation(item.to, item.label)}
+                className={`text-lg transition-all duration-300 ${
                   index === 3
-                    ? "border border-[#00F7FF] px-6 py-1 rounded-lg hover:bg-[#84f2f6] hover:text-gray-900 transition-all"
-                    : "hover:text-[#00F7FF]"
+                    ? "border border-[#00F7FF] px-6 py-2 rounded-lg hover:bg-cyan-300 hover:text-gray-900"
+                    : "hover:text-white"
                 }`}
               >
                 {item.label}

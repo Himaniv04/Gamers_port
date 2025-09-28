@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import ButtonGallery from "./ButtonGallery";
-import { useNavigate } from "react-router-dom"; // ✅ Hook for navigation
+import { Link } from "react-router-dom";  // ✅ Hook for navigation
 
 const galleryItems = [
   {
@@ -36,15 +36,9 @@ const itemVariant = {
 };
 
 const Gallery = () => {
-  const navigate = useNavigate(); // ✅ Navigation hook
-
-  // Button click handler
-  const handleViewGallery = () => {
-    navigate("/gallery-tab"); // ✅ Open GalleryTab component
-  };
 
   return (
-    <section className="py-10 md:py-18 px-10 gradient-bg">
+    <section className="py-10 md:py-18 px-10 bg-[linear-gradient(to_bottom_right,#0a0f3c,#1e3a8a,#6d28d9,#6d28d9,#ec4899)] ">
       <div className="container mx-auto px-4">
         {/* Heading */}
         <motion.div
@@ -54,10 +48,10 @@ const Gallery = () => {
           transition={{ duration: 0.6, ease: "easeOut" }}
           viewport={{ once: true }}
         >
-          <h2 className="gaming-font text-2xl md:text-4xl mb-4">
-            OUR <span className="text-[#00F7FF]">GAMING SPACE</span>
+          <h2 className="gaming-font text-4xl md:text-6xl mb-2">
+            OUR <span className="gaming-font  text-[#00F7FF]">GAMING SPACE</span>
           </h2>
-          <p className="gaming-font text-gray-300 max-w-3xl mx-auto text-sm">
+          <p className=" text-gray-300 max-w-3xl mx-auto md:text-lg text-sm">
             Step into the future of gaming with our state-of-the-art facilities designed for maximum immersion.
           </p>
         </motion.div>
@@ -92,13 +86,15 @@ const Gallery = () => {
 
         {/* View Gallery Button */}
         <motion.div
-          className="text-center mt-12"
+          className="text-center mt-12 flex justify-center"
           initial={{ opacity: 0, y: 60 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut", delay: 0.3 }}
           viewport={{ once: true }}
         >
-          <ButtonGallery onClick={handleViewGallery}>View Gallery</ButtonGallery>
+            <Link to="/gallery-tab">
+            <ButtonGallery>View Gallery</ButtonGallery>
+          </Link>
         </motion.div>
       </div>
     </section>

@@ -86,7 +86,7 @@ const App = () => {
             ref={scrollRef}
             id="main-container"
             data-scroll-container
-            className="bg-gray-900 text-white"
+            className="bg-gray-900 text-white overflow-hidden"
           >
             <Navbar scroll={scroll} />
 

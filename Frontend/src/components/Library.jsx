@@ -6,8 +6,10 @@ const Library = () => {
   const items = Array(8).fill("🎮");
 
   return (
-    <section id="hero" className="pt-6 md:pt-10 bg-gray-900 p-4 text-center">
-      <h2 className="gaming-font text-2xl text-white md:text-6xl mt-8">
+    <section id="hero" className="bg-gray-900 px-4 text-center">
+      <div className="h-[0.2vh] w-[80%] bg-gradient-to-r from-gray-800 via-cyan-500 to-gray-800 mx-auto" />
+      <div className="pt-4 md:pt-8 ">
+      <h2 className="gaming-font text-4xl text-white md:text-6xl mt-4">
         OUR <span className="gaming-font text-cyan-300">COLLECTION</span>
       </h2>
       <p className=" text-gray-400 max-w-3xl mx-auto">
@@ -50,6 +52,7 @@ const Library = () => {
             ))}
           </div>
         </div>
+      </div>
       </div>
     </section>
   );

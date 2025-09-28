@@ -6,10 +6,10 @@ const Contact = () => {
 
       {/* Header */}
       <div className="text-center mb-4 md:mb-10">
-        <h2 className="pixel-font text-2xl md:text-4xl mt-10 mb-2">
-          FEEL FREE TO <span className="text-[#00F7FF]">CONTACT US</span>
+        <h2 className="gaming-font text-4xl md:text-6xl mt-10 mb-2">
+          FEEL FREE TO <span className="gaming-font text-[#00F7FF]">CONTACT US</span>
         </h2>
-        <p className="gaming-font text-gray-400 text-sm md:text-base mx-auto">
+        <p className=" text-gray-400 text-sm md:text-base mx-auto">
           Reach out and join the ultimate gaming community experience.
         </p>
       </div>
@@ -82,7 +82,7 @@ const Contact = () => {
                   href={link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full bg-gray-900 text-[#00F7FF] hover:bg-[#00F7FF] hover:text-gray-900 transition-colors duration-300"
+                  className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full bg-gray-900 text-[#00F7FF] hover:bg-[#00F7FF] hover:text-gray-900 transition-colors duration-300"
                 >
                   <i className={`ri-${icon} text-lg md:text-2xl`}></i>
                 </a>
@@ -92,12 +92,12 @@ const Contact = () => {
         </div>
 
         {/* Right Side - Map & CTA */}
-        <div className="w-full md:w-1/2 mt-6 md:mt-0 flex flex-col items-start space-y-4">
+        <div className="w-full md:w-1/2 flex flex-col items-start space-y-4">
 
           {/* Map */}
-          <div className="relative w-full h-64 rounded-lg overflow-hidden shadow-lg">
+          <div className="hidden md:block relative w-full h-64 rounded-lg overflow-hidden shadow-lg">
             <iframe
-              className="hidden md:block w-full h-full"
+              className="w-full h-full"
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14680.113979327954!2d81.350919!3d21.190449!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a2923e9c3c05b07%3A0x65d09e2c2a6e1a3c!2sBhilai%2C%20Chhattisgarh!5e0!3m2!1sen!2sin!4v1694774382180!5m2!1sen!2sin"
               width="100%"
               height="100%"
@@ -115,7 +115,7 @@ const Contact = () => {
 
           {/* Mobile Location Button */}
           <div className="md:hidden w-full flex justify-center">
-            <button className="flex items-center gap-2 bg-gray-900 text-[#00F7FF] px-6 py-3 rounded-lg shadow-md hover:bg-[#00F7FF] hover:text-gray-900 transition">
+            <button className="w-full bg-[#00F7FF] text-gray-900 px-4 md:px-6 py-3 rounded-lg font-semibold hover:bg-[#00d4ff] transition flex items-center justify-center">
               <i className="ri-map-pin-2-fill text-lg"></i> Location
             </button>
           </div>

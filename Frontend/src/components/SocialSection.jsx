@@ -34,7 +34,7 @@ const SocialSection = () => {
     <section
       className="relative bg-gray-900 py-20 text-center overflow-hidden"
       style={{
-        backgroundImage: `url(${hero})`,
+        backgroundImage:" url(${hero})",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}

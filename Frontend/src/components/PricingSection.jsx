@@ -2,20 +2,21 @@ import React from "react";
 
 export default function PricingSection() {
   return (
-    <section className="min-h-screen bg-[#0d1117] flex flex-col items-center justify-center px-4 py-16">
+    <section className=" bg-gray-900 px-4 py-14 md:py-16">
       {/* Heading */}
+
       <div className="text-center mb-12">
-        <h2 className="text-3xl md:text-5xl font-extrabold text-white tracking-widest">
-          CHOOSE <span className="text-[#00F7FF]">YOUR</span>{" "}
-          <span className="text-[#00F7FF]">BATTLE PLAN</span>
+        <h2 className="gaming-font text-4xl md:text-6xl mb-2 text-white">
+          CHOOSE YOUR{" "}
+          <span className="gaming-font text-[#00F7FF]">BATTLE PLAN</span>
         </h2>
-        <p className="text-gray-400 mt-3 text-lg">
+        <p className="text-gray-400 text-sm md:text-lg">
           Select the perfect gaming package that suits your needs and budget.
         </p>
       </div>
 
       {/* Pricing Card */}
-      <div className="bg-gradient-to-b from-[#1f1c2c] to-[#2c5364] rounded-xl border border-[#00F7FF] shadow-[0_0_20px_#00F7FF] max-w-md w-full">
+      <div className="bg-gradient-to-b mx-auto from-[#866aff]/70 to-[#44c7ff]/70 rounded-xl border border-[#00F7FF] shadow-cyan-500 shadow-lg max-w-md w-full">
         {/* Top Strip */}
         <div className="bg-[#00F7FF] text-black font-bold text-center py-2 rounded-t-xl tracking-wider">
           PREMIUM GAMING EXPERIENCE
