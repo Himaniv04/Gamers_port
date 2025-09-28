@@ -63,7 +63,7 @@ const Footer = () => {
 
           {/* Column 2: Quick Links */}
           <div className="md:ml-35 hidden md:block">
-            <h3 className="gaming-font text-white text-lg mb-4">Quick Links</h3>
+            <h3 className=" text-white text-lg mb-4">Quick Links</h3>
             <ul className="space-y-2">
               {navItems.map((item, index) => (
                 <li key={index}>
@@ -80,7 +80,7 @@ const Footer = () => {
 
           {/* Column 3: Contact Info */}
           <div className="md:mt-0 mt-6 hidden md:block">
-            <h4 className="gaming-font text-white text-lg mb-4">Contact Us</h4>
+            <h4 className=" text-white text-lg mb-4">Contact Us</h4>
             <ul className="space-y-2">
               <li className="flex items-start">
                 <div className="flex items-center justify-center text-[#00F7FF] mt-1">

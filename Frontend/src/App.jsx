@@ -18,6 +18,7 @@ import "remixicon/fonts/remixicon.css";
 import LocomotiveScroll from "locomotive-scroll";
 import "locomotive-scroll/dist/locomotive-scroll.css";
 
+
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Route, Routes, useLocation } from "react-router-dom";
@@ -27,6 +28,9 @@ const App = () => {
   const scrollRef = useRef(null);
   const [scroll, setScroll] = useState(null);
   const location = useLocation();
+
+  //Backend
+  
 
   useEffect(() => {
     let locoScroll;
