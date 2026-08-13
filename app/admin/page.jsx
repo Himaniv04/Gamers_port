@@ -1,0 +1,60 @@
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import connectToDatabase from "@/lib/db";
+import Station from "@/models/Station";
+import Booking from "@/models/Booking";
+import Post from "@/models/Post";
+import Gallery from "@/models/Gallery";
+import AdminDashboardClient from "@/components/admin/AdminDashboardClient";
+
+export const dynamic = "force-dynamic";
+
+export default async function AdminPage() {
+  const { userId } = await auth();
+
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  const user = await currentUser();
+  const adminEmails = (process.env.CLERK_ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase());
+
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress?.toLowerCase();
+
+  // If CLERK_ADMIN_EMAILS is configured, enforce strict access
+  const isAuthorized = !adminEmails.length || (userEmail && adminEmails.includes(userEmail));
+
+  if (!isAuthorized) {
+    return (
+      <div className="max-w-2xl mx-auto my-20 p-8 glass-panel rounded-3xl text-center space-y-4 border border-red-500/30">
+        <h1 className="text-3xl font-extrabold text-red-400">ACCESS DENIED</h1>
+        <p className="text-gray-300">
+          Your account (<span className="text-cyan-400">{userEmail}</span>) is not listed as an authorized administrator.
+        </p>
+        <p className="text-xs text-gray-500 font-mono">
+          Configure CLERK_ADMIN_EMAILS in .env to grant access.
+        </p>
+      </div>
+    );
+  }
+
+  await connectToDatabase();
+
+  const stations = await Station.find().sort({ type: 1, name: 1 }).lean();
+  const bookings = await Booking.find().populate("stationId").sort({ createdAt: -1 }).limit(50).lean();
+  const posts = await Post.find().sort({ createdAt: -1 }).lean();
+  const photos = await Gallery.find().sort({ createdAt: -1 }).lean();
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <AdminDashboardClient
+        initialStations={JSON.parse(JSON.stringify(stations))}
+        initialBookings={JSON.parse(JSON.stringify(bookings))}
+        initialPosts={JSON.parse(JSON.stringify(posts))}
+        initialPhotos={JSON.parse(JSON.stringify(photos))}
+      />
+    </div>
+  );
+}
