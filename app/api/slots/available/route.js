@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/db";
 import Booking from "@/models/Booking";
 
+export const dynamic = "force-dynamic";
+
 // Operating hours: 8 AM (08:00) to 10 PM (22:00)
 const OPERATING_START_HOUR = 8;
 const OPERATING_END_HOUR = 22;

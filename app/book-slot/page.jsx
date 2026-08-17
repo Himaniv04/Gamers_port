@@ -10,6 +10,7 @@ export default function BookSlotPage() {
 
   // State
   const [stations, setStations] = useState([]);
+  const [loadingStations, setLoadingStations] = useState(true);
   const [selectedStationId, setSelectedStationId] = useState(initialStationId);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -34,17 +35,18 @@ export default function BookSlotPage() {
   // Fetch Stations on load
   useEffect(() => {
     async function fetchStations() {
+      setLoadingStations(true);
       try {
         const res = await fetch("/api/stations");
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setStations(data);
-          if (!selectedStationId && data.length > 0) {
-            setSelectedStationId(data[0]._id);
-          }
+          setSelectedStationId((prev) => (prev ? prev : data[0]._id));
         }
       } catch (err) {
         console.error("Failed to load stations", err);
+      } finally {
+        setLoadingStations(false);
       }
     }
     fetchStations();
@@ -140,7 +142,7 @@ export default function BookSlotPage() {
       setLockTimeRemaining(600); // 10 minutes
 
       // Immediately trigger Razorpay Order Creation
-      handleCheckout(lockData.bookingId);
+      handleCheckout(lockData.bookingId, lockData.totalAmount);
     } catch (err) {
       setErrorMsg(err.message);
       setIsProcessingPayment(false);
@@ -148,54 +150,92 @@ export default function BookSlotPage() {
   };
 
   // Handle Step 2: Open Razorpay Modal & Verify
-  const handleCheckout = async (bookingId) => {
+  const handleCheckout = async (bookingId, amountInRupees) => {
     try {
-      const orderRes = await fetch("/api/payments/create-order", {
+      // 1. Call Backend Order Creation (/api/create-order)
+      const amountInPaise = Math.round((amountInRupees || 100) * 100);
+
+      const orderRes = await fetch("/api/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId }),
+        body: JSON.stringify({
+          amount: amountInPaise,
+          currency: "INR",
+          receipt: `rcpt_${bookingId}_${Date.now()}`,
+          bookingId,
+        }),
       });
+
+      const contentType = orderRes.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await orderRes.text();
+        throw new Error(`Server returned non-JSON response (${orderRes.status}): ${text.slice(0, 100)}`);
+      }
 
       const orderData = await orderRes.json();
 
       if (!orderRes.ok) {
-        throw new Error(orderData.error || "Failed to create payment order");
+        throw new Error(orderData.error || "Failed to create Razorpay payment order");
       }
 
       const selectedStation = stations.find((s) => s._id === selectedStationId);
 
+      // 2. Configure Razorpay Standard Checkout Options
       const options = {
-        key: orderData.key || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        key: orderData.key_id || orderData.key || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TQsiWoDT3leCLG",
         amount: orderData.amount,
-        currency: orderData.currency,
+        currency: orderData.currency || "INR",
         name: "Gamer's Port Lounge",
-        description: `Booking ${selectedStation?.name} on ${selectedDate} (${selectedSlot.startTime}-${selectedSlot.endTime})`,
-        order_id: orderData.orderId,
+        description: `Booking ${selectedStation?.name || "Gaming Rig"} on ${selectedDate} (${selectedSlot?.startTime}-${selectedSlot?.endTime})`,
+        order_id: orderData.order_id || orderData.orderId,
         handler: async function (response) {
-          // Verify signature on server
-          const verifyRes = await fetch("/api/payments/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-              bookingId,
-            }),
-          });
+          try {
+            // 3. Send payment details to Verify Signature Endpoint (/api/verify-payment)
+            const verifyRes = await fetch("/api/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                bookingId,
+              }),
+            });
 
-          const verifyData = await verifyRes.json();
-          if (verifyRes.ok && verifyData.success) {
-            setBookingSuccess(verifyData.booking);
-            setLockedBooking(null);
-          } else {
-            setErrorMsg(verifyData.error || "Payment verification failed");
+            const vContentType = verifyRes.headers.get("content-type");
+            let verifyData;
+            if (vContentType && vContentType.includes("application/json")) {
+              verifyData = await verifyRes.json();
+            } else {
+              const text = await verifyRes.text();
+              throw new Error(`Verification server returned non-JSON response (${verifyRes.status}): ${text.slice(0, 100)}`);
+            }
+
+            if (verifyRes.ok && verifyData.success) {
+              setBookingSuccess({
+                userName,
+                userEmail,
+                bookingDate: selectedDate,
+                startTime: selectedSlot.startTime,
+                endTime: selectedSlot.endTime,
+                durationHours: duration,
+                totalAmount: amountInRupees,
+                razorpayPaymentId: response.razorpay_payment_id,
+              });
+              setLockedBooking(null);
+            } else {
+              setErrorMsg(verifyData.error || "Payment signature verification failed!");
+            }
+          } catch (vErr) {
+            setErrorMsg("Payment verification network error: " + vErr.message);
+          } finally {
+            setIsProcessingPayment(false);
           }
-          setIsProcessingPayment(false);
         },
         modal: {
           ondismiss: function () {
             setIsProcessingPayment(false);
+            setErrorMsg("Payment process was cancelled by the user.");
           },
         },
         prefill: {
@@ -210,6 +250,15 @@ export default function BookSlotPage() {
 
       if (window.Razorpay) {
         const rzp = new window.Razorpay(options);
+        
+        // Handle payment failure event
+        rzp.on("payment.failed", function (response) {
+          setIsProcessingPayment(false);
+          setErrorMsg(
+            `Payment Failed! Reason: ${response.error?.description || "Transaction failed"}`
+          );
+        });
+
         rzp.open();
       } else {
         throw new Error("Razorpay SDK failed to load. Please check your internet connection.");
@@ -285,25 +334,35 @@ export default function BookSlotPage() {
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Gamepad2 className="w-5 h-5 text-cyan-400" /> 1. Select Gaming Station
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {stations.map((st) => (
-                  <button
-                    key={st._id}
-                    onClick={() => setSelectedStationId(st._id)}
-                    className={`p-4 rounded-xl text-left border transition-all duration-200 ${
-                      selectedStationId === st._id
-                        ? "bg-cyan-500/10 border-cyan-400 neon-border-cyan"
-                        : "bg-gray-900/50 border-gray-800 hover:border-gray-700"
-                    }`}
-                  >
-                    <div className="text-xs font-mono font-bold text-cyan-400 mb-1">{st.type}</div>
-                    <div className="font-bold text-white text-sm mb-2">{st.name}</div>
-                    <div className="text-xs text-emerald-400 font-bold font-display">
-                      ₹{st.hourlyRate}/hr
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {loadingStations ? (
+                <div className="py-6 text-center text-cyan-400 animate-pulse font-mono">
+                  Loading gaming stations...
+                </div>
+              ) : stations.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {stations.map((st) => (
+                    <button
+                      key={st._id}
+                      onClick={() => setSelectedStationId(st._id)}
+                      className={`p-4 rounded-xl text-left border transition-all duration-200 ${
+                        selectedStationId === st._id
+                          ? "bg-cyan-500/10 border-cyan-400 neon-border-cyan"
+                          : "bg-gray-900/50 border-gray-800 hover:border-gray-700"
+                      }`}
+                    >
+                      <div className="text-xs font-mono font-bold text-cyan-400 mb-1">{st.type}</div>
+                      <div className="font-bold text-white text-sm mb-2">{st.name}</div>
+                      <div className="text-xs text-emerald-400 font-bold font-display">
+                        ₹{st.hourlyRate}/hr
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-4 text-center text-gray-400">
+                  No gaming stations available. Please refresh or contact admin.
+                </div>
+              )}
             </div>
 
             {/* STEP 2: CHOOSE DATE & DURATION */}

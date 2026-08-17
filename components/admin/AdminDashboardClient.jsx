@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, Trophy, Calendar as CalendarIcon, Gamepad2, Upload, Trash2, Plus, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Camera, Trophy, Calendar as CalendarIcon, Gamepad2, Upload, Trash2, Edit, Plus, RefreshCw, CheckCircle2, X } from "lucide-react";
 
 export default function AdminDashboardClient({
   initialStations,
@@ -16,7 +16,7 @@ export default function AdminDashboardClient({
   const [posts, setPosts] = useState(initialPosts);
   const [photos, setPhotos] = useState(initialPhotos);
 
-  // Upload States
+  // Upload States for Photo Gallery
   const [uploading, setUploading] = useState(false);
   const [photoTitle, setPhotoTitle] = useState("");
   const [photoCategory, setPhotoCategory] = useState("Ambience");
@@ -29,22 +29,24 @@ export default function AdminDashboardClient({
   const [postEventDate, setPostEventDate] = useState("");
   const [postBannerFile, setPostBannerFile] = useState(null);
 
-  // Station Form States
+  // Station Form States (Add & Update)
+  const [editingStationId, setEditingStationId] = useState(null);
   const [stName, setStName] = useState("");
   const [stType, setStType] = useState("PC");
   const [stRate, setStRate] = useState("150");
-  const [stSpecs, setStSpecs] = useState("RTX 4080, i9-14900K, 240Hz OLED");
+  const [stSpecs, setStSpecs] = useState("RTX 4080, i9-14900K, 32GB DDR5, 240Hz OLED");
+  const [stIsActive, setStIsActive] = useState(true);
 
   const [statusMsg, setStatusMsg] = useState("");
 
   // Seed Default Stations Helper
   const handleSeedStations = async () => {
     const defaultStations = [
-      { name: "Pro Rig #1 - RTX 4090", type: "PC", specs: ["RTX 4090", "i9-14900K", "32GB DDR5", "240Hz Monitor"], hourlyRate: 200 },
-      { name: "Pro Rig #2 - RTX 4080", type: "PC", specs: ["RTX 4080", "i7-13700K", "32GB DDR5", "240Hz Monitor"], hourlyRate: 150 },
-      { name: "PS5 VIP Booth #1", type: "CONSOLE", specs: ["PlayStation 5", "55 inch 4K OLED HDR", "DualSense Controllers"], hourlyRate: 180 },
-      { name: "PS5 VIP Booth #2", type: "CONSOLE", specs: ["PlayStation 5", "55 inch 4K OLED HDR", "DualSense Controllers"], hourlyRate: 180 },
-      { name: "VR Quest 3 Simulator", type: "VR", specs: ["Meta Quest 3 512GB", "Haptic Racing Seat", "Wi-Fi 6E"], hourlyRate: 250 },
+      { name: "Pro Rig #1 - RTX 4090", type: "PC", specs: ["RTX 4090", "i9-14900K", "32GB DDR5", "240Hz OLED"], hourlyRate: 200, isActive: true },
+      { name: "Pro Rig #2 - RTX 4080", type: "PC", specs: ["RTX 4080", "i7-13700K", "32GB DDR5", "240Hz OLED"], hourlyRate: 150, isActive: true },
+      { name: "PS5 VIP Booth #1", type: "CONSOLE", specs: ["PlayStation 5", "55 inch 4K OLED", "DualSense Edge"], hourlyRate: 180, isActive: true },
+      { name: "PS5 VIP Booth #2", type: "CONSOLE", specs: ["PlayStation 5", "55 inch 4K OLED", "DualSense Edge"], hourlyRate: 180, isActive: true },
+      { name: "VR Quest 3 Simulator", type: "VR", specs: ["Meta Quest 3 512GB", "Haptic Racing Seat", "Wi-Fi 6E"], hourlyRate: 250, isActive: true },
     ];
 
     try {
@@ -63,6 +65,105 @@ export default function AdminDashboardClient({
     }
   };
 
+  // ADD or UPDATE Gaming Station
+  const handleAddOrUpdateStation = async (e) => {
+    e.preventDefault();
+    if (!stName || !stRate) {
+      setStatusMsg("Station name and rate are required.");
+      return;
+    }
+
+    setUploading(true);
+    setStatusMsg("");
+
+    try {
+      if (editingStationId) {
+        // UPDATE STATION (PUT)
+        const res = await fetch("/api/stations", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingStationId,
+            name: stName,
+            type: stType,
+            hourlyRate: stRate,
+            specs: stSpecs,
+            isActive: stIsActive,
+          }),
+        });
+
+        const updated = await res.json();
+        if (!res.ok) throw new Error(updated.error || "Failed to update station");
+
+        setStations(stations.map((s) => (s._id === editingStationId ? updated : s)));
+        setStatusMsg(`Station "${updated.name}" updated successfully!`);
+        resetStationForm();
+      } else {
+        // ADD NEW STATION (POST)
+        const res = await fetch("/api/stations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: stName,
+            type: stType,
+            hourlyRate: stRate,
+            specs: stSpecs,
+            isActive: stIsActive,
+          }),
+        });
+
+        const newStation = await res.json();
+        if (!res.ok) throw new Error(newStation.error || "Failed to create station");
+
+        setStations([...stations, newStation]);
+        setStatusMsg(`New station "${newStation.name}" added successfully!`);
+        resetStationForm();
+      }
+    } catch (err) {
+      setStatusMsg(`Error: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Populate form for Editing Station
+  const handleEditClick = (station) => {
+    setEditingStationId(station._id);
+    setStName(station.name);
+    setStType(station.type);
+    setStRate(station.hourlyRate);
+    setStSpecs(Array.isArray(station.specs) ? station.specs.join(", ") : "");
+    setStIsActive(station.isActive !== false);
+  };
+
+  // Reset Station Form
+  const resetStationForm = () => {
+    setEditingStationId(null);
+    setStName("");
+    setStType("PC");
+    setStRate("150");
+    setStSpecs("");
+    setStIsActive(true);
+  };
+
+  // DELETE Station
+  const handleDeleteStation = async (id, name) => {
+    if (!confirm(`Are you sure you want to delete station "${name}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/stations?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Failed to delete station");
+
+      setStations(stations.filter((s) => s._id !== id));
+      setStatusMsg(`Station "${name}" deleted successfully!`);
+      if (editingStationId === id) resetStationForm();
+    } catch (err) {
+      setStatusMsg(`Delete Error: ${err.message}`);
+    }
+  };
+
   // Upload Photo to Cloudinary & Save to Gallery
   const handleUploadPhoto = async (e) => {
     e.preventDefault();
@@ -72,7 +173,6 @@ export default function AdminDashboardClient({
     setStatusMsg("");
 
     try {
-      // 1. Upload to Cloudinary API
       const formData = new FormData();
       formData.append("file", photoFile);
 
@@ -84,7 +184,6 @@ export default function AdminDashboardClient({
       const upData = await upRes.json();
       if (!upRes.ok) throw new Error(upData.error || "Upload failed");
 
-      // 2. Save metadata to DB
       const metaRes = await fetch("/api/admin/gallery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -452,36 +551,186 @@ export default function AdminDashboardClient({
         </div>
       )}
 
-      {/* TAB 4: STATIONS MANAGER */}
+      {/* TAB 4: STATIONS MANAGER (FULL CRUD: ADD, UPDATE, DELETE, SEED) */}
       {activeTab === "stations" && (
-        <div className="glass-panel p-6 rounded-2xl space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-white">Configured Gaming Stations</h2>
-            {stations.length === 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* ADD / EDIT STATION FORM */}
+          <form onSubmit={handleAddOrUpdateStation} className="glass-panel p-6 rounded-2xl space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                {editingStationId ? (
+                  <>
+                    <Edit className="w-5 h-5 text-cyan-400" /> Edit Station
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5 text-cyan-400" /> Add Gaming Station
+                  </>
+                )}
+              </h2>
+              {editingStationId && (
+                <button
+                  type="button"
+                  onClick={resetStationForm}
+                  className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                >
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </button>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase">Station Name</label>
+              <input
+                type="text"
+                required
+                value={stName}
+                onChange={(e) => setStName(e.target.value)}
+                placeholder="e.g., Pro Rig #3 - RTX 4090"
+                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white text-sm mt-1"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Station Type</label>
+                <select
+                  value={stType}
+                  onChange={(e) => setStType(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-xs mt-1"
+                >
+                  <option value="PC">PC Rig</option>
+                  <option value="CONSOLE">Console Booth (PS5)</option>
+                  <option value="VR">VR Simulator</option>
+                  <option value="SIMULATOR">Racing Simulator</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Hourly Rate (₹)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={stRate}
+                  onChange={(e) => setStRate(e.target.value)}
+                  placeholder="150"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-xs mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase">
+                Hardware Specs (Comma Separated)
+              </label>
+              <input
+                type="text"
+                value={stSpecs}
+                onChange={(e) => setStSpecs(e.target.value)}
+                placeholder="e.g., RTX 4090, i9-14900K, 240Hz OLED"
+                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white text-sm mt-1"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <label className="flex items-center gap-2 text-xs text-gray-300 font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={stIsActive}
+                  onChange={(e) => setStIsActive(e.target.checked)}
+                  className="w-4 h-4 rounded bg-gray-900 border-gray-800 text-cyan-400 focus:ring-0"
+                />
+                Station Active for Bookings
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={uploading}
+              className={`w-full py-3 rounded-xl font-bold font-display transition-all ${
+                editingStationId
+                  ? "bg-amber-500 text-black hover:bg-amber-400"
+                  : "bg-cyan-500 text-black hover:bg-cyan-400"
+              }`}
+            >
+              {uploading
+                ? "Saving..."
+                : editingStationId
+                ? "Update Station"
+                : "Add Gaming Station"}
+            </button>
+          </form>
+
+          {/* STATION LIST GRID */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white">Configured Gaming Stations</h2>
               <button
                 onClick={handleSeedStations}
-                className="px-4 py-2 rounded-xl bg-cyan-500 text-black font-bold font-display text-xs flex items-center gap-2 hover:bg-cyan-400"
+                className="px-3.5 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-cyan-400 font-bold font-display text-xs flex items-center gap-2 border border-cyan-500/20"
               >
-                <Plus className="w-4 h-4" /> Seed Preset Stations (5 Rigs)
+                <RefreshCw className="w-3.5 h-3.5" /> Re-seed Defaults
               </button>
-            )}
-          </div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {stations.map((s) => (
-              <div key={s._id} className="bg-gray-900/80 p-4 rounded-xl border border-gray-800 space-y-2">
-                <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase">{s.type}</span>
-                <h3 className="font-bold text-white text-base">{s.name}</h3>
-                <div className="text-xs text-emerald-400 font-bold">₹{s.hourlyRate}/hour</div>
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {s.specs?.map((spec, i) => (
-                    <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-300">
-                      {spec}
-                    </span>
-                  ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {stations.map((s) => (
+                <div
+                  key={s._id}
+                  className={`p-5 rounded-2xl border transition-all space-y-3 flex flex-col justify-between ${
+                    editingStationId === s._id
+                      ? "bg-cyan-950/30 border-cyan-400 neon-border-cyan"
+                      : "bg-gray-900/80 border-gray-800 hover:border-gray-700"
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase">
+                        {s.type}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          s.isActive !== false
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "bg-red-500/20 text-red-400"
+                        }`}
+                      >
+                        {s.isActive !== false ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-white text-base">{s.name}</h3>
+                    <div className="text-xs text-emerald-400 font-bold font-display">
+                      ₹{s.hourlyRate}/hour
+                    </div>
+
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {s.specs?.map((spec, i) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-300">
+                          {spec}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-800/60">
+                    <button
+                      onClick={() => handleEditClick(s)}
+                      className="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-black font-bold text-xs flex items-center gap-1 transition-all"
+                    >
+                      <Edit className="w-3.5 h-3.5" /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStation(s._id, s.name)}
+                      className="px-3 py-1.5 rounded-lg bg-red-600/10 text-red-400 hover:bg-red-600 hover:text-white font-bold text-xs flex items-center gap-1 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
