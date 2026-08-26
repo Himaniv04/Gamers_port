@@ -1,11 +1,9 @@
 {
-  "/book-slot/page": "app/book-slot/page.js",
   "/page": "app/page.js",
-  "/api/stations/route": "app/api/stations/route.js",
-  "/api/slots/available/route": "app/api/slots/available/route.js",
+  "/book-slot/page": "app/book-slot/page.js",
+  "/admin/page": "app/admin/page.js",
   "/gallery/page": "app/gallery/page.js",
   "/events/page": "app/events/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/api/bookings/lock/route": "app/api/bookings/lock/route.js",
-  "/api/create-order/route": "app/api/create-order/route.js"
+  "/api/stations/route": "app/api/stations/route.js",
+  "/api/slots/available/route": "app/api/slots/available/route.js"
 }

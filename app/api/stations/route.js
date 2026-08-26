@@ -70,6 +70,15 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     await connectToDatabase();
+    const { searchParams } = new URL(req.url);
+
+    // Re-seed action: wipe all stations and insert defaults
+    if (searchParams.get("seed") === "true") {
+      await Station.deleteMany({});
+      const created = await Station.insertMany(defaultStations);
+      return NextResponse.json(created, { status: 201 });
+    }
+
     const body = await req.json();
 
     if (Array.isArray(body)) {

@@ -39,29 +39,26 @@ export default function AdminDashboardClient({
 
   const [statusMsg, setStatusMsg] = useState("");
 
-  // Seed Default Stations Helper
+  // Seed Default Stations Helper — clears existing stations then re-seeds defaults
   const handleSeedStations = async () => {
-    const defaultStations = [
-      { name: "Pro Rig #1 - RTX 4090", type: "PC", specs: ["RTX 4090", "i9-14900K", "32GB DDR5", "240Hz OLED"], hourlyRate: 200, isActive: true },
-      { name: "Pro Rig #2 - RTX 4080", type: "PC", specs: ["RTX 4080", "i7-13700K", "32GB DDR5", "240Hz OLED"], hourlyRate: 150, isActive: true },
-      { name: "PS5 VIP Booth #1", type: "CONSOLE", specs: ["PlayStation 5", "55 inch 4K OLED", "DualSense Edge"], hourlyRate: 180, isActive: true },
-      { name: "PS5 VIP Booth #2", type: "CONSOLE", specs: ["PlayStation 5", "55 inch 4K OLED", "DualSense Edge"], hourlyRate: 180, isActive: true },
-      { name: "VR Quest 3 Simulator", type: "VR", specs: ["Meta Quest 3 512GB", "Haptic Racing Seat", "Wi-Fi 6E"], hourlyRate: 250, isActive: true },
-    ];
+    if (!confirm("This will delete ALL existing stations and replace them with the defaults. Continue?")) return;
 
     try {
-      const res = await fetch("/api/stations", {
+      const res = await fetch("/api/stations?seed=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(defaultStations),
+        body: JSON.stringify({ action: "seed" }),
       });
       const data = await res.json();
       if (res.ok) {
         setStations(data);
-        setStatusMsg("Successfully seeded default gaming stations!");
+        setStatusMsg("Successfully re-seeded default gaming stations!");
+      } else {
+        setStatusMsg(data.error || "Failed to re-seed stations.");
       }
     } catch (err) {
       console.error(err);
+      setStatusMsg("Error re-seeding stations.");
     }
   };
 
