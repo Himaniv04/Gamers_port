@@ -1,10 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import connectToDatabase from "@/lib/db";
-import Station from "@/models/Station";
-import Booking from "@/models/Booking";
-import Post from "@/models/Post";
-import Gallery from "@/models/Gallery";
+import prisma from "@/lib/db";
 import AdminDashboardClient from "@/components/admin/AdminDashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -40,20 +36,32 @@ export default async function AdminPage() {
     );
   }
 
-  await connectToDatabase();
+  const [stations, bookings, posts, photos, operatingHours] = await Promise.all([
+    prisma.station.findMany({ orderBy: [{ type: "asc" }, { name: "asc" }] }),
+    prisma.booking.findMany({
+      include: { station: true },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.post.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.gallery.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.operatingHours.findMany({ orderBy: { dayOfWeek: "asc" } }),
+  ]);
 
-  const stations = await Station.find().sort({ type: 1, name: 1 }).lean();
-  const bookings = await Booking.find().populate("stationId").sort({ createdAt: -1 }).limit(50).lean();
-  const posts = await Post.find().sort({ createdAt: -1 }).lean();
-  const photos = await Gallery.find().sort({ createdAt: -1 }).lean();
+  // Normalize: rename `station` relation to `stationId` field shape expected by AdminDashboardClient
+  const normalizedBookings = bookings.map((b) => ({
+    ...b,
+    stationId: b.station,
+  }));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <AdminDashboardClient
         initialStations={JSON.parse(JSON.stringify(stations))}
-        initialBookings={JSON.parse(JSON.stringify(bookings))}
+        initialBookings={JSON.parse(JSON.stringify(normalizedBookings))}
         initialPosts={JSON.parse(JSON.stringify(posts))}
         initialPhotos={JSON.parse(JSON.stringify(photos))}
+        initialHours={JSON.parse(JSON.stringify(operatingHours))}
       />
     </div>
   );

@@ -1,0 +1,122 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Station {
+  id         Int       @id @default(autoincrement())
+  name       String
+  type       StationType @default(PC)
+  specs      String[]
+  hourlyRate Float
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  bookings   Booking[]
+
+  @@map("stations")
+}
+
+model Booking {
+  id                 Int           @id @default(autoincrement())
+  stationId          Int
+  station            Station       @relation(fields: [stationId], references: [id])
+  userEmail          String
+  userName           String
+  userPhone          String
+  bookingDate        String        // Stored as "YYYY-MM-DD" — may be the session-origin date for overnight slots
+  startTime          String        // "HH:00" — can exceed "23:00" for overnight (e.g. "26:00" = 2 AM next day)
+  endTime            String        // "HH:00" — same extended notation
+  durationHours      Int           @default(1)
+  totalAmount        Float
+  status             BookingStatus @default(PENDING)
+  lockExpiresAt      DateTime
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  razorpaySignature  String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([stationId, bookingDate, status])
+  @@map("bookings")
+}
+
+model Post {
+  id              Int          @id @default(autoincrement())
+  title           String
+  slug            String       @unique
+  description     String
+  content         String       @default("")
+  bannerUrl       String
+  bannerPublicId  String       @default("")
+  eventDate       DateTime?
+  category        PostCategory @default(ANNOUNCEMENT)
+  isPublished     Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("posts")
+}
+
+model Gallery {
+  id          Int      @id @default(autoincrement())
+  title       String
+  imageUrl    String
+  publicId    String
+  category    String   @default("Ambience")
+  tags        String[]
+  uploadedBy  String   @default("Admin")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("gallery")
+}
+
+model Subscriber {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscribers")
+}
+
+model OperatingHours {
+  id          Int     @id @default(autoincrement())
+  dayOfWeek   Int     @unique  // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+  openHour    Int     @default(8)   // 0–23
+  closeHour   Int     @default(22)  // 1–47: values > 23 indicate overnight (e.g. 46 = 10 PM next day)
+  isOvernight Boolean @default(false)
+  isClosed    Boolean @default(false)
+  updatedAt   DateTime @updatedAt
+
+  @@map("operating_hours")
+}
+
+enum StationType {
+  PC
+  CONSOLE
+  VR
+  SIMULATOR
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum PostCategory {
+  TOURNAMENT
+  OFFER
+  ANNOUNCEMENT
+}

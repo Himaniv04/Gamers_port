@@ -1,14 +1,15 @@
-import connectToDatabase from "@/lib/db";
-import Post from "@/models/Post";
+import prisma from "@/lib/db";
 import { Trophy, Calendar, Sparkles, Tag } from "lucide-react";
 
 export const revalidate = 30;
 
 async function getEventsAndPosts() {
   try {
-    await connectToDatabase();
-    const posts = await Post.find({ isPublished: true }).sort({ createdAt: -1 }).lean();
-    return JSON.parse(JSON.stringify(posts));
+    const posts = await prisma.post.findMany({
+      where: { isPublished: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return posts;
   } catch (error) {
     return [];
   }
@@ -21,10 +22,10 @@ export default async function EventsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-12">
       <div className="text-center space-y-4">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 text-sm font-semibold">
-          <Trophy className="w-4 h-4" /> TOURNAMENTS & ANNOUNCEMENTS
+          <Trophy className="w-4 h-4" /> TOURNAMENTS &amp; ANNOUNCEMENTS
         </div>
         <h1 className="text-4xl sm:text-5xl font-extrabold text-white uppercase tracking-wider">
-          EVENTS & <span className="text-purple-400">NEWS</span>
+          EVENTS &amp; <span className="text-purple-400">NEWS</span>
         </h1>
         <p className="text-gray-400 max-w-2xl mx-auto">
           Stay updated with upcoming LAN tournaments, weekend deals, and community announcements.
@@ -35,7 +36,7 @@ export default async function EventsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {posts.map((post) => (
             <div
-              key={post._id}
+              key={post.id}
               className="glass-panel rounded-2xl overflow-hidden border border-purple-500/20 hover:border-purple-400 transition-all duration-300 flex flex-col justify-between"
             >
               <div className="relative h-64 w-full">

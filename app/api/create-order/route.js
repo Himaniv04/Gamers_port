@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import connectToDatabase from "@/lib/db";
-import Booking from "@/models/Booking";
+import prisma from "@/lib/db";
 import razorpay from "@/lib/razorpay";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +13,9 @@ export async function POST(req) {
     let targetBooking = null;
 
     if (bookingId) {
-      await connectToDatabase();
-      targetBooking = await Booking.findById(bookingId);
+      targetBooking = await prisma.booking.findUnique({
+        where: { id: Number(bookingId) },
+      });
 
       if (!targetBooking) {
         return NextResponse.json({ error: "Booking record not found" }, { status: 404 });
@@ -29,8 +29,10 @@ export async function POST(req) {
       }
 
       if (new Date() > new Date(targetBooking.lockExpiresAt)) {
-        targetBooking.status = "EXPIRED";
-        await targetBooking.save();
+        targetBooking = await prisma.booking.update({
+          where: { id: Number(bookingId) },
+          data: { status: "EXPIRED" },
+        });
         return NextResponse.json(
           { error: "Reservation lock expired. Please select the slot again." },
           { status: 410 }
@@ -60,7 +62,7 @@ export async function POST(req) {
       receipt: receipt || `rcpt_${bookingId || Date.now()}`,
       notes: targetBooking
         ? {
-            bookingId: targetBooking._id.toString(),
+            bookingId: targetBooking.id.toString(),
             userEmail: targetBooking.userEmail,
           }
         : {},
@@ -69,8 +71,10 @@ export async function POST(req) {
     const order = await razorpay.orders.create(options);
 
     if (targetBooking) {
-      targetBooking.razorpayOrderId = order.id;
-      await targetBooking.save();
+      targetBooking = await prisma.booking.update({
+        where: { id: Number(bookingId) },
+        data: { razorpayOrderId: order.id },
+      });
     }
 
     return NextResponse.json({
@@ -81,7 +85,7 @@ export async function POST(req) {
       currency: order.currency,
       key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID,
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID,
-      bookingId: targetBooking?._id,
+      bookingId: targetBooking?.id,
     });
   } catch (error) {
     console.error("Razorpay Order Creation Error:", error);

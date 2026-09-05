@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { Gamepad2, Cpu, Monitor, Zap, Trophy, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
-import connectToDatabase from "@/lib/db";
-import Station from "@/models/Station";
-import Post from "@/models/Post";
+import prisma from "@/lib/db";
 
 export const revalidate = 60; // Revalidate dynamic content every 60 seconds
 
 async function getFeaturedData() {
   try {
-    await connectToDatabase();
-    const stations = await Station.find({ isActive: true }).limit(3).lean();
-    const latestEvent = await Post.findOne({ category: "TOURNAMENT", isPublished: true })
-      .sort({ createdAt: -1 })
-      .lean();
-    return { stations: JSON.parse(JSON.stringify(stations)), latestEvent: JSON.parse(JSON.stringify(latestEvent)) };
+    const stations = await prisma.station.findMany({
+      where: { isActive: true },
+      take: 3,
+    });
+    const latestEvent = await prisma.post.findFirst({
+      where: { category: "TOURNAMENT", isPublished: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return { stations, latestEvent };
   } catch (error) {
     return { stations: [], latestEvent: null };
   }
@@ -32,7 +33,7 @@ export default async function HomePage() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-sm font-semibold tracking-wide">
-            <Sparkles className="w-4 h-4" /> NEXT-GEN GAMING PORTAL & CAFE
+            <Sparkles className="w-4 h-4" /> NEXT-GEN GAMING PORTAL &amp; CAFE
           </div>
 
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white uppercase leading-none">
@@ -75,7 +76,7 @@ export default async function HomePage() {
           {stations.length > 0 ? (
             stations.map((st) => (
               <div
-                key={st._id}
+                key={st.id}
                 className="glass-panel p-6 rounded-2xl border border-cyan-500/20 hover:border-cyan-400 transition-all duration-300 hover:-translate-y-1 space-y-6"
               >
                 <div className="flex justify-between items-start">
@@ -99,7 +100,7 @@ export default async function HomePage() {
                 </div>
 
                 <Link
-                  href={`/book-slot?stationId=${st._id}`}
+                  href={`/book-slot?stationId=${st.id}`}
                   className="block text-center w-full py-3 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-black font-bold font-display transition-all duration-200"
                 >
                   Book This Station
@@ -143,7 +144,7 @@ export default async function HomePage() {
             </div>
             <h3 className="text-xl font-bold text-white">Instant Payment Verification</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Powered by Razorpay & Stripe with automated webhook confirmation and instant digital pass receipt.
+              Powered by Razorpay &amp; Stripe with automated webhook confirmation and instant digital pass receipt.
             </p>
           </div>
         </div>

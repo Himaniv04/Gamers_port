@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import connectToDatabase from "@/lib/db";
-import Gallery from "@/models/Gallery";
+import prisma from "@/lib/db";
 import cloudinary from "@/lib/cloudinary";
 
 async function verifyAdmin() {
@@ -20,8 +19,9 @@ async function verifyAdmin() {
 // GET: Public or Admin view gallery photos
 export async function GET(req) {
   try {
-    await connectToDatabase();
-    const photos = await Gallery.find().sort({ createdAt: -1 });
+    const photos = await prisma.gallery.findMany({
+      orderBy: { createdAt: "desc" },
+    });
     return NextResponse.json(photos);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch gallery items" }, { status: 500 });
@@ -36,16 +36,17 @@ export async function POST(req) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await connectToDatabase();
     const body = await req.json();
     const { title, imageUrl, publicId, category, tags } = body;
 
-    const newPhoto = await Gallery.create({
-      title,
-      imageUrl,
-      publicId,
-      category: category || "Ambience",
-      tags: tags || [],
+    const newPhoto = await prisma.gallery.create({
+      data: {
+        title,
+        imageUrl,
+        publicId,
+        category: category || "Ambience",
+        tags: tags || [],
+      },
     });
 
     return NextResponse.json(newPhoto, { status: 201 });
@@ -69,8 +70,12 @@ export async function DELETE(req) {
       return NextResponse.json({ error: "Photo ID required" }, { status: 400 });
     }
 
-    await connectToDatabase();
-    const photo = await Gallery.findById(id);
+    let photo;
+    try {
+      photo = await prisma.gallery.findUnique({ where: { id: Number(id) } });
+    } catch (e) {
+      return NextResponse.json({ error: "Photo not found" }, { status: 404 });
+    }
 
     if (!photo) {
       return NextResponse.json({ error: "Photo not found" }, { status: 404 });
@@ -81,7 +86,7 @@ export async function DELETE(req) {
       await cloudinary.uploader.destroy(photo.publicId);
     }
 
-    await Gallery.findByIdAndDelete(id);
+    await prisma.gallery.delete({ where: { id: Number(id) } });
 
     return NextResponse.json({ message: "Photo deleted successfully" });
   } catch (error) {

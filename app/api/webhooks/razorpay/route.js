@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import connectToDatabase from "@/lib/db";
-import Booking from "@/models/Booking";
+import prisma from "@/lib/db";
 
 export async function POST(req) {
   try {
@@ -28,16 +27,21 @@ export async function POST(req) {
       const orderId = paymentEntity.order_id;
       const paymentId = paymentEntity.id;
 
-      await connectToDatabase();
+      const booking = await prisma.booking.findFirst({
+        where: { razorpayOrderId: orderId },
+      });
 
-      const booking = await Booking.findOne({ razorpayOrderId: orderId });
       if (booking) {
-        booking.status = "CONFIRMED";
-        booking.razorpayPaymentId = paymentId;
-        booking.razorpaySignature = signature || "verified_webhook";
-        await booking.save();
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: "CONFIRMED",
+            razorpayPaymentId: paymentId,
+            razorpaySignature: signature || "verified_webhook",
+          },
+        });
 
-        console.log(`Booking ${booking._id} CONFIRMED via Razorpay webhook`);
+        console.log(`Booking ${booking.id} CONFIRMED via Razorpay webhook`);
       }
     }
 

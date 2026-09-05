@@ -1,9 +1,8 @@
 {
   "/page": "app/page.js",
   "/book-slot/page": "app/book-slot/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/gallery/page": "app/gallery/page.js",
-  "/events/page": "app/events/page.js",
   "/api/stations/route": "app/api/stations/route.js",
-  "/api/slots/available/route": "app/api/slots/available/route.js"
+  "/api/slots/available/route": "app/api/slots/available/route.js",
+  "/api/admin/operating-hours/route": "app/api/admin/operating-hours/route.js",
+  "/admin/page": "app/admin/page.js"
 }

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import connectToDatabase from "@/lib/db";
-import Booking from "@/models/Booking";
+import prisma from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -45,15 +44,15 @@ export async function POST(req) {
     let booking = null;
     if (bookingId) {
       try {
-        await connectToDatabase();
-        booking = await Booking.findById(bookingId);
-        if (booking) {
-          booking.status = "CONFIRMED";
-          booking.razorpayPaymentId = razorpay_payment_id;
-          booking.razorpayOrderId = razorpay_order_id;
-          booking.razorpaySignature = razorpay_signature;
-          await booking.save();
-        }
+        booking = await prisma.booking.update({
+          where: { id: Number(bookingId) },
+          data: {
+            status: "CONFIRMED",
+            razorpayPaymentId: razorpay_payment_id,
+            razorpayOrderId: razorpay_order_id,
+            razorpaySignature: razorpay_signature,
+          },
+        });
       } catch (dbErr) {
         console.warn("Database booking update error during payment verification:", dbErr.message);
       }

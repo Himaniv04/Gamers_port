@@ -1,5 +1,4 @@
-import connectToDatabase from "@/lib/db";
-import Gallery from "@/models/Gallery";
+import prisma from "@/lib/db";
 import Image from "next/image";
 import { Image as ImageIcon, Camera } from "lucide-react";
 
@@ -7,9 +6,10 @@ export const revalidate = 30;
 
 async function getGalleryPhotos() {
   try {
-    await connectToDatabase();
-    const photos = await Gallery.find().sort({ createdAt: -1 }).lean();
-    return JSON.parse(JSON.stringify(photos));
+    const photos = await prisma.gallery.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    return photos;
   } catch (error) {
     return [];
   }
@@ -22,7 +22,7 @@ export default async function GalleryPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-12">
       <div className="text-center space-y-4">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-sm font-semibold">
-          <Camera className="w-4 h-4" /> VIBE & HARDWARE GALLERY
+          <Camera className="w-4 h-4" /> VIBE &amp; HARDWARE GALLERY
         </div>
         <h1 className="text-4xl sm:text-5xl font-extrabold text-white uppercase tracking-wider">
           GAMING LOUNGE <span className="text-cyan-400">GALLERY</span>
@@ -36,7 +36,7 @@ export default async function GalleryPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {photos.map((photo) => (
             <div
-              key={photo._id}
+              key={photo.id}
               className="group relative h-80 rounded-2xl overflow-hidden glass-panel border border-cyan-500/20 hover:border-cyan-400 transition-all duration-300"
             >
               <img

@@ -18,13 +18,13 @@ const Newsletter = () => {
 
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:5000/subscribe", { email });
-      setMessage(res.data);
+      const res = await axios.post("/api/subscribe", { email });
+      setMessage(res.data.message || "Subscribed successfully!");
       setEmail("");
       setIsAgreed(false);
     } catch (err) {
-      if (err.response) {
-        setMessage(err.response.data); // Backend error message
+      if (err.response?.data?.error) {
+        setMessage(err.response.data.error);
       } else {
         setMessage("Something went wrong! Try again.");
       }

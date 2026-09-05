@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import connectToDatabase from "@/lib/db";
-import Booking from "@/models/Booking";
-import Station from "@/models/Station";
+import prisma from "@/lib/db";
 
 // Helper: Convert "HH:MM" string to total minutes
 const timeToMinutes = (timeStr) => {
@@ -9,9 +7,22 @@ const timeToMinutes = (timeStr) => {
   return h * 60 + m;
 };
 
+// Helper: expire stale PENDING bookings (replaces MongoDB TTL index)
+async function expireStaleBookings() {
+  await prisma.booking.updateMany({
+    where: {
+      status: "PENDING",
+      lockExpiresAt: { lt: new Date() },
+    },
+    data: { status: "EXPIRED" },
+  });
+}
+
 export async function POST(req) {
   try {
-    await connectToDatabase();
+    // Expire stale locks before checking availability
+    await expireStaleBookings();
+
     const body = await req.json();
 
     const {
@@ -40,7 +51,9 @@ export async function POST(req) {
       );
     }
 
-    const station = await Station.findById(stationId);
+    const station = await prisma.station.findUnique({
+      where: { id: Number(stationId) },
+    });
     if (!station || !station.isActive) {
       return NextResponse.json(
         { error: "Gaming station is invalid or inactive" },
@@ -52,14 +65,16 @@ export async function POST(req) {
     const requestedStart = timeToMinutes(startTime);
     const requestedEnd = timeToMinutes(endTime);
 
-    // Lock condition check: Find any conflicting booking for same station and date
-    const existingConflicts = await Booking.find({
-      stationId,
-      bookingDate,
-      $or: [
-        { status: "CONFIRMED" },
-        { status: "PENDING", lockExpiresAt: { $gt: now } },
-      ],
+    // Find any conflicting booking for same station and date
+    const existingConflicts = await prisma.booking.findMany({
+      where: {
+        stationId: Number(stationId),
+        bookingDate,
+        OR: [
+          { status: "CONFIRMED" },
+          { status: "PENDING", lockExpiresAt: { gt: now } },
+        ],
+      },
     });
 
     const hasOverlap = existingConflicts.some((booking) => {
@@ -80,23 +95,25 @@ export async function POST(req) {
     const duration = durationHours || 1;
     const totalAmount = station.hourlyRate * duration;
 
-    const pendingBooking = await Booking.create({
-      stationId,
-      userEmail,
-      userName,
-      userPhone,
-      bookingDate,
-      startTime,
-      endTime,
-      durationHours: duration,
-      totalAmount,
-      status: "PENDING",
-      lockExpiresAt,
+    const pendingBooking = await prisma.booking.create({
+      data: {
+        stationId: Number(stationId),
+        userEmail,
+        userName,
+        userPhone,
+        bookingDate,
+        startTime,
+        endTime,
+        durationHours: duration,
+        totalAmount,
+        status: "PENDING",
+        lockExpiresAt,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      bookingId: pendingBooking._id,
+      bookingId: pendingBooking.id,
       lockExpiresAt: pendingBooking.lockExpiresAt,
       totalAmount: pendingBooking.totalAmount,
       stationName: station.name,

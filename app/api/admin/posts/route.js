@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import connectToDatabase from "@/lib/db";
-import Post from "@/models/Post";
+import prisma from "@/lib/db";
 import cloudinary from "@/lib/cloudinary";
 
 async function verifyAdmin() {
@@ -20,8 +19,9 @@ async function verifyAdmin() {
 // GET: Fetch posts (published for public, all for admin)
 export async function GET(req) {
   try {
-    await connectToDatabase();
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const posts = await prisma.post.findMany({
+      orderBy: { createdAt: "desc" },
+    });
     return NextResponse.json(posts);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 });
@@ -36,24 +36,28 @@ export async function POST(req) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await connectToDatabase();
     const body = await req.json();
     const { title, description, content, bannerUrl, bannerPublicId, eventDate, category } = body;
 
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "") + "-" + Date.now();
+    const slug =
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "") +
+      "-" +
+      Date.now();
 
-    const post = await Post.create({
-      title,
-      slug,
-      description,
-      content,
-      bannerUrl,
-      bannerPublicId,
-      eventDate: eventDate ? new Date(eventDate) : null,
-      category: category || "ANNOUNCEMENT",
+    const post = await prisma.post.create({
+      data: {
+        title,
+        slug,
+        description,
+        content,
+        bannerUrl,
+        bannerPublicId,
+        eventDate: eventDate ? new Date(eventDate) : null,
+        category: category || "ANNOUNCEMENT",
+      },
     });
 
     return NextResponse.json(post, { status: 201 });
@@ -77,8 +81,12 @@ export async function DELETE(req) {
       return NextResponse.json({ error: "Post ID required" }, { status: 400 });
     }
 
-    await connectToDatabase();
-    const post = await Post.findById(id);
+    let post;
+    try {
+      post = await prisma.post.findUnique({ where: { id: Number(id) } });
+    } catch (e) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
 
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
@@ -88,7 +96,7 @@ export async function DELETE(req) {
       await cloudinary.uploader.destroy(post.bannerPublicId);
     }
 
-    await Post.findByIdAndDelete(id);
+    await prisma.post.delete({ where: { id: Number(id) } });
 
     return NextResponse.json({ message: "Post deleted successfully" });
   } catch (error) {

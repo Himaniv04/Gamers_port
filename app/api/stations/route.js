@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import connectToDatabase from "@/lib/db";
-import Station from "@/models/Station";
+import prisma from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -42,21 +41,27 @@ const defaultStations = [
   },
 ];
 
-// GET: List gaming stations (Auto-seeds defaults if database collection is empty)
+// GET: List gaming stations (Auto-seeds defaults if database table is empty)
 export async function GET(req) {
   try {
-    await connectToDatabase();
     const { searchParams } = new URL(req.url);
     const includeAll = searchParams.get("all") === "true";
 
-    const filter = includeAll ? {} : { isActive: true };
-    let stations = await Station.find(filter).sort({ type: 1, name: 1 });
+    const where = includeAll ? {} : { isActive: true };
+    let stations = await prisma.station.findMany({
+      where,
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+    });
 
-    // Auto-seed default stations if collection is completely empty
-    const totalCount = await Station.countDocuments();
+    // Auto-seed default stations if table is completely empty
+    const totalCount = await prisma.station.count();
     if (totalCount === 0) {
       console.log("No stations found in database. Auto-seeding default stations...");
-      stations = await Station.insertMany(defaultStations);
+      await prisma.station.createMany({ data: defaultStations });
+      stations = await prisma.station.findMany({
+        where,
+        orderBy: [{ type: "asc" }, { name: "asc" }],
+      });
     }
 
     return NextResponse.json(stations);
@@ -69,20 +74,21 @@ export async function GET(req) {
 // POST: Add new gaming station or bulk seed
 export async function POST(req) {
   try {
-    await connectToDatabase();
     const { searchParams } = new URL(req.url);
 
     // Re-seed action: wipe all stations and insert defaults
     if (searchParams.get("seed") === "true") {
-      await Station.deleteMany({});
-      const created = await Station.insertMany(defaultStations);
+      await prisma.station.deleteMany({});
+      await prisma.station.createMany({ data: defaultStations });
+      const created = await prisma.station.findMany();
       return NextResponse.json(created, { status: 201 });
     }
 
     const body = await req.json();
 
     if (Array.isArray(body)) {
-      const created = await Station.insertMany(body);
+      await prisma.station.createMany({ data: body });
+      const created = await prisma.station.findMany();
       return NextResponse.json(created, { status: 201 });
     }
 
@@ -95,17 +101,19 @@ export async function POST(req) {
       );
     }
 
-    const station = await Station.create({
-      name,
-      type: type || "PC",
-      specs: Array.isArray(specs)
-        ? specs
-        : (specs || "")
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-      hourlyRate: Number(hourlyRate),
-      isActive: isActive !== undefined ? Boolean(isActive) : true,
+    const station = await prisma.station.create({
+      data: {
+        name,
+        type: type || "PC",
+        specs: Array.isArray(specs)
+          ? specs
+          : (specs || "")
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+        hourlyRate: Number(hourlyRate),
+        isActive: isActive !== undefined ? Boolean(isActive) : true,
+      },
     });
 
     return NextResponse.json(station, { status: 201 });
@@ -120,7 +128,6 @@ export async function POST(req) {
 // PUT: Update an existing gaming station
 export async function PUT(req) {
   try {
-    await connectToDatabase();
     const body = await req.json();
     const { id, name, type, specs, hourlyRate, isActive } = body;
 
@@ -142,16 +149,18 @@ export async function PUT(req) {
             .filter(Boolean);
     }
 
-    const updatedStation = await Station.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!updatedStation) {
-      return NextResponse.json({ error: "Station not found" }, { status: 404 });
+    try {
+      const updatedStation = await prisma.station.update({
+        where: { id: Number(id) },
+        data: updateData,
+      });
+      return NextResponse.json(updatedStation);
+    } catch (e) {
+      if (e.code === "P2025") {
+        return NextResponse.json({ error: "Station not found" }, { status: 404 });
+      }
+      throw e;
     }
-
-    return NextResponse.json(updatedStation);
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "Failed to update station" },
@@ -163,7 +172,6 @@ export async function PUT(req) {
 // DELETE: Delete a gaming station
 export async function DELETE(req) {
   try {
-    await connectToDatabase();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
@@ -171,10 +179,13 @@ export async function DELETE(req) {
       return NextResponse.json({ error: "Station ID is required for deletion" }, { status: 400 });
     }
 
-    const deleted = await Station.findByIdAndDelete(id);
-
-    if (!deleted) {
-      return NextResponse.json({ error: "Station not found" }, { status: 404 });
+    try {
+      await prisma.station.delete({ where: { id: Number(id) } });
+    } catch (e) {
+      if (e.code === "P2025") {
+        return NextResponse.json({ error: "Station not found" }, { status: 404 });
+      }
+      throw e;
     }
 
     return NextResponse.json({ message: "Station deleted successfully", id });

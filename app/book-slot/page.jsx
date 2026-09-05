@@ -17,6 +17,7 @@ export default function BookSlotPage() {
   );
   const [duration, setDuration] = useState(1);
   const [slots, setSlots] = useState([]);
+  const [isClosedDay, setIsClosedDay] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
@@ -41,7 +42,7 @@ export default function BookSlotPage() {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           setStations(data);
-          setSelectedStationId((prev) => (prev ? prev : data[0]._id));
+          setSelectedStationId((prev) => (prev ? prev : String(data[0].id)));
         }
       } catch (err) {
         console.error("Failed to load stations", err);
@@ -60,12 +61,17 @@ export default function BookSlotPage() {
       setLoadingSlots(true);
       setErrorMsg("");
       setSelectedSlot(null);
+      setIsClosedDay(false);
       try {
         const res = await fetch(
           `/api/slots/available?date=${selectedDate}&stationId=${selectedStationId}&duration=${duration}`
         );
         const data = await res.json();
-        if (data.slots) {
+        if (data.isClosed) {
+          setIsClosedDay(true);
+          setSlots([]);
+        } else if (data.slots) {
+          setIsClosedDay(false);
           setSlots(data.slots);
         } else if (data.error) {
           setErrorMsg(data.error);
@@ -122,7 +128,8 @@ export default function BookSlotPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stationId: selectedStationId,
-          bookingDate: selectedDate,
+          // Use slot.bookingDate — overnight continuation slots store under previous day's date
+          bookingDate: selectedSlot.bookingDate || selectedDate,
           startTime: selectedSlot.startTime,
           endTime: selectedSlot.endTime,
           durationHours: duration,
@@ -178,7 +185,7 @@ export default function BookSlotPage() {
         throw new Error(orderData.error || "Failed to create Razorpay payment order");
       }
 
-      const selectedStation = stations.find((s) => s._id === selectedStationId);
+      const selectedStation = stations.find((s) => String(s.id) === String(selectedStationId));
 
       // 2. Configure Razorpay Standard Checkout Options
       const options = {
@@ -269,7 +276,7 @@ export default function BookSlotPage() {
     }
   };
 
-  const activeStation = stations.find((s) => s._id === selectedStationId);
+  const activeStation = stations.find((s) => String(s.id) === String(selectedStationId));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
@@ -278,7 +285,7 @@ export default function BookSlotPage() {
           REAL-TIME <span className="text-cyan-400">SLOT BOOKING ENGINE</span>
         </h1>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          Operating Hours: 8:00 AM to 10:00 PM Daily. Select your station, date, and time slot with instant anti-double-booking protection.
+          Select your station, date, and time slot. Operating hours are managed by the admin. Instant anti-double-booking protection.
         </p>
       </div>
 
@@ -342,10 +349,10 @@ export default function BookSlotPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {stations.map((st) => (
                     <button
-                      key={st._id}
-                      onClick={() => setSelectedStationId(st._id)}
+                      key={st.id}
+                      onClick={() => setSelectedStationId(String(st.id))}
                       className={`p-4 rounded-xl text-left border transition-all duration-200 ${
-                        selectedStationId === st._id
+                        String(selectedStationId) === String(st.id)
                           ? "bg-cyan-500/10 border-cyan-400 neon-border-cyan"
                           : "bg-gray-900/50 border-gray-800 hover:border-gray-700"
                       }`}
@@ -413,24 +420,33 @@ export default function BookSlotPage() {
                 <div className="py-12 text-center text-cyan-400 animate-pulse font-mono">
                   Checking real-time slot availability...
                 </div>
+              ) : isClosedDay ? (
+                <div className="py-10 text-center space-y-2">
+                  <div className="text-4xl">🔒</div>
+                  <p className="text-red-400 font-bold">Shop is Closed</p>
+                  <p className="text-gray-500 text-sm">No slots available on this day. Try another date.</p>
+                </div>
               ) : slots.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {slots.map((slot, idx) => (
                     <button
                       key={idx}
                       disabled={!slot.isAvailable}
                       onClick={() => setSelectedSlot(slot)}
-                      className={`p-3 rounded-xl border text-center font-mono text-sm transition-all ${
+                      className={`p-3 rounded-xl border text-center transition-all ${
                         !slot.isAvailable
-                          ? "bg-red-950/20 border-red-900/30 text-gray-600 cursor-not-allowed line-through"
-                          : selectedSlot?.startTime === slot.startTime
+                          ? "bg-red-950/20 border-red-900/30 text-gray-600 cursor-not-allowed"
+                          : selectedSlot?.startTime === slot.startTime && selectedSlot?.bookingDate === slot.bookingDate
                           ? "bg-cyan-500 text-black font-bold border-cyan-400 shadow-lg shadow-cyan-500/20"
                           : "bg-gray-900/80 border-gray-800 text-gray-200 hover:border-cyan-500/50"
                       }`}
                     >
-                      <div>{slot.startTime} - {slot.endTime}</div>
-                      <div className="text-[10px] mt-1 uppercase font-sans">
-                        {slot.isAvailable ? "Available" : "Booked"}
+                      <div className="font-mono text-sm">{slot.displayStartTime || slot.startTime}</div>
+                      <div className="font-mono text-xs text-gray-400">→ {slot.displayEndTime || slot.endTime}</div>
+                      <div className={`text-[10px] mt-1 uppercase font-sans ${
+                        slot.isOvernightContinuation ? "text-purple-400" : ""
+                      }`}>
+                        {!slot.isAvailable ? "Booked" : slot.isOvernightContinuation ? "🌙 Next Day" : "Available"}
                       </div>
                     </button>
                   ))}
@@ -515,7 +531,7 @@ export default function BookSlotPage() {
                 <div className="flex justify-between text-gray-400">
                   <span>Time Slot:</span>
                   <span className="text-cyan-400">
-                    {selectedSlot ? `${selectedSlot.startTime} - ${selectedSlot.endTime}` : "None"}
+                    {selectedSlot ? `${selectedSlot.displayStartTime || selectedSlot.startTime} – ${selectedSlot.displayEndTime || selectedSlot.endTime}` : "None"}
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-400">
