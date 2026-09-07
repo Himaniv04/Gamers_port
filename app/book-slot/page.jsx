@@ -20,6 +20,9 @@ export default function BookSlotPage() {
   const [isClosedDay, setIsClosedDay] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [playerCount, setPlayerCount] = useState(1);
+  const [minHours, setMinHours] = useState(1);
+  const [maxHours, setMaxHours] = useState(4);
 
   // Customer Details Form
   const [userName, setUserName] = useState("");
@@ -73,6 +76,13 @@ export default function BookSlotPage() {
         } else if (data.slots) {
           setIsClosedDay(false);
           setSlots(data.slots);
+          // Update duration limits from operating hours
+          const min = data.operatingHours?.minBookingHours ?? 1;
+          const max = data.operatingHours?.maxBookingHours ?? 4;
+          setMinHours(min);
+          setMaxHours(max);
+          // Clamp current duration to new limits
+          setDuration((prev) => Math.min(max, Math.max(min, prev)));
         } else if (data.error) {
           setErrorMsg(data.error);
         }
@@ -133,6 +143,7 @@ export default function BookSlotPage() {
           startTime: selectedSlot.startTime,
           endTime: selectedSlot.endTime,
           durationHours: duration,
+          playerCount,
           userName,
           userEmail,
           userPhone,
@@ -278,6 +289,12 @@ export default function BookSlotPage() {
 
   const activeStation = stations.find((s) => String(s.id) === String(selectedStationId));
 
+  // ── Live Pricing Calculation (mirrors server logic) ────────────────────────
+  const baseCost    = activeStation ? activeStation.hourlyRate * duration : 0;
+  const extraPlayers = Math.max(0, playerCount - 1);
+  const extraCost   = activeStation ? activeStation.extraPlayerFee * extraPlayers * Math.ceil(duration) : 0;
+  const liveTotal   = Math.round((baseCost + extraCost) * 100) / 100;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
       <div className="text-center space-y-4">
@@ -373,41 +390,84 @@ export default function BookSlotPage() {
             </div>
 
             {/* STEP 2: CHOOSE DATE & DURATION */}
-            <div className="glass-panel p-6 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-300 flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4 text-cyan-400" /> Date
-                </label>
-                <input
-                  type="date"
-                  min={new Date().toISOString().split("T")[0]}
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-400"
-                />
-              </div>
+            <div className="glass-panel p-6 rounded-2xl space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-300 flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-cyan-400" /> Date
+                  </label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split("T")[0]}
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-300 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-cyan-400" /> Duration Block
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[1, 2].map((hrs) => (
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-300 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-cyan-400" /> Duration
+                  </label>
+                  {/* Stepper: − [value] + */}
+                  <div className="flex items-center gap-3">
                     <button
-                      key={hrs}
                       type="button"
-                      onClick={() => setDuration(hrs)}
-                      className={`py-3 rounded-xl font-bold text-sm transition-all ${
-                        duration === hrs
-                          ? "bg-cyan-500 text-black font-display"
-                          : "bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-700"
-                      }`}
-                    >
-                      {hrs} Hour{hrs > 1 ? "s" : ""}
-                    </button>
-                  ))}
+                      id="duration-decrease"
+                      onClick={() => setDuration((d) => Math.max(minHours, parseFloat((d - 0.5).toFixed(1))))}
+                      disabled={duration <= minHours}
+                      className="w-10 h-10 rounded-xl bg-gray-900 border border-gray-800 text-gray-200 font-bold text-xl hover:bg-gray-800 hover:border-cyan-500/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
+                    >−</button>
+                    <div className="flex-1 text-center">
+                      <div className="text-2xl font-extrabold text-white font-display">{duration}h</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{minHours}h min · {maxHours}h max</div>
+                    </div>
+                    <button
+                      type="button"
+                      id="duration-increase"
+                      onClick={() => setDuration((d) => Math.min(maxHours, parseFloat((d + 0.5).toFixed(1))))}
+                      disabled={duration >= maxHours}
+                      className="w-10 h-10 rounded-xl bg-gray-900 border border-gray-800 text-gray-200 font-bold text-xl hover:bg-gray-800 hover:border-cyan-500/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
+                    >+</button>
+                  </div>
                 </div>
               </div>
+
+              {/* Player Count Selector */}
+              {activeStation && activeStation.maxPlayers > 1 && (
+                <div className="space-y-3 pt-2 border-t border-gray-800">
+                  <label className="text-sm font-bold text-gray-300">
+                    👥 Number of Players
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      ({activeStation.minPlayers}–{activeStation.maxPlayers} allowed)
+                    </span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(
+                      { length: activeStation.maxPlayers - activeStation.minPlayers + 1 },
+                      (_, i) => i + activeStation.minPlayers
+                    ).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setPlayerCount(n)}
+                        className={`w-12 h-12 rounded-xl font-bold text-base transition-all ${
+                          playerCount === n
+                            ? "bg-purple-500 text-white shadow-lg shadow-purple-500/20"
+                            : "bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-700"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  {activeStation.extraPlayerFee > 0 && playerCount > 1 && (
+                    <p className="text-xs text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-2">
+                      ₹{activeStation.extraPlayerFee}/hr × {playerCount - 1} extra player(s) × ⌈{duration}⌉ hrs = <strong>₹{extraCost}</strong> surcharge
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* STEP 3: AVAILABLE SLOTS GRID */}
@@ -443,10 +503,8 @@ export default function BookSlotPage() {
                     >
                       <div className="font-mono text-sm">{slot.displayStartTime || slot.startTime}</div>
                       <div className="font-mono text-xs text-gray-400">→ {slot.displayEndTime || slot.endTime}</div>
-                      <div className={`text-[10px] mt-1 uppercase font-sans ${
-                        slot.isOvernightContinuation ? "text-purple-400" : ""
-                      }`}>
-                        {!slot.isAvailable ? "Booked" : slot.isOvernightContinuation ? "🌙 Next Day" : "Available"}
+                      <div className="text-[10px] mt-1 uppercase font-sans">
+                        {!slot.isAvailable ? "Booked" : "Available"}
                       </div>
                     </button>
                   ))}
@@ -538,11 +596,28 @@ export default function BookSlotPage() {
                   <span>Duration:</span>
                   <span className="text-white">{duration} Hour(s)</span>
                 </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Players:</span>
+                  <span className="text-white">{playerCount}</span>
+                </div>
+
+                {/* Pricing Breakdown */}
+                <div className="pt-2 space-y-1.5 border-t border-gray-800">
+                  <div className="flex justify-between text-gray-500 text-xs">
+                    <span>Base (₹{activeStation?.hourlyRate || 0} × {duration}h):</span>
+                    <span className="text-gray-300">₹{baseCost.toFixed(2)}</span>
+                  </div>
+                  {extraCost > 0 && (
+                    <div className="flex justify-between text-purple-400 text-xs">
+                      <span>Extra players ({playerCount - 1} × ₹{activeStation?.extraPlayerFee}/hr × ⌈{duration}⌉h):</span>
+                      <span>₹{extraCost.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex justify-between pt-2 text-lg font-bold font-display text-white border-t border-gray-800">
                   <span>Total Amount:</span>
-                  <span className="text-emerald-400">
-                    ₹{(activeStation?.hourlyRate || 0) * duration}
-                  </span>
+                  <span className="text-emerald-400">₹{liveTotal.toFixed(2)}</span>
                 </div>
               </div>
 

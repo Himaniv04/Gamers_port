@@ -13,11 +13,14 @@ model Station {
   id         Int       @id @default(autoincrement())
   name       String
   type       StationType @default(PC)
-  specs      String[]
-  hourlyRate Float
-  isActive   Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  specs          String[]
+  hourlyRate     Float
+  minPlayers     Int     @default(1)   // minimum players required per booking
+  maxPlayers     Int     @default(1)   // maximum players allowed per booking
+  extraPlayerFee Float   @default(0)   // ₹ per extra player per hour (ceil-billed)
+  isActive       Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   bookings   Booking[]
 
@@ -34,7 +37,8 @@ model Booking {
   bookingDate        String        // Stored as "YYYY-MM-DD" — may be the session-origin date for overnight slots
   startTime          String        // "HH:00" — can exceed "23:00" for overnight (e.g. "26:00" = 2 AM next day)
   endTime            String        // "HH:00" — same extended notation
-  durationHours      Int           @default(1)
+  durationHours      Float         @default(1)   // supports fractional hours e.g. 1.5
+  playerCount        Int           @default(1)   // number of players in this booking
   totalAmount        Float
   status             BookingStatus @default(PENDING)
   lockExpiresAt      DateTime
@@ -90,13 +94,15 @@ model Subscriber {
 }
 
 model OperatingHours {
-  id          Int     @id @default(autoincrement())
-  dayOfWeek   Int     @unique  // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-  openHour    Int     @default(8)   // 0–23
-  closeHour   Int     @default(22)  // 1–47: values > 23 indicate overnight (e.g. 46 = 10 PM next day)
-  isOvernight Boolean @default(false)
-  isClosed    Boolean @default(false)
-  updatedAt   DateTime @updatedAt
+  id              Int     @id @default(autoincrement())
+  dayOfWeek       Int     @unique  // 0=Sunday, 1=Monday … 6=Saturday
+  openHour        Int     @default(8)
+  closeHour       Int     @default(22)  // >23 = overnight (e.g. 46 = 10 PM next day)
+  isOvernight     Boolean @default(false)
+  isClosed        Boolean @default(false)
+  minBookingHours Float   @default(1)   // minimum session length (e.g. 0.5, 1, 1.5)
+  maxBookingHours Float   @default(4)   // maximum session length
+  updatedAt       DateTime @updatedAt
 
   @@map("operating_hours")
 }

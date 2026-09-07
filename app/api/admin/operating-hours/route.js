@@ -6,13 +6,13 @@ export const dynamic = "force-dynamic";
 
 // Default schedule used when the table is empty
 const DEFAULT_HOURS = [
-  { dayOfWeek: 0, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: true  }, // Sunday: Closed
-  { dayOfWeek: 1, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false }, // Monday
-  { dayOfWeek: 2, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false }, // Tuesday
-  { dayOfWeek: 3, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false }, // Wednesday
-  { dayOfWeek: 4, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false }, // Thursday
-  { dayOfWeek: 5, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false }, // Friday
-  { dayOfWeek: 6, openHour: 8,  closeHour: 46, isOvernight: true,  isClosed: false }, // Saturday (overnight → Sunday 10 PM)
+  { dayOfWeek: 0, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: true,  minBookingHours: 1, maxBookingHours: 4 },
+  { dayOfWeek: 1, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false, minBookingHours: 1, maxBookingHours: 4 },
+  { dayOfWeek: 2, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false, minBookingHours: 1, maxBookingHours: 4 },
+  { dayOfWeek: 3, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false, minBookingHours: 1, maxBookingHours: 4 },
+  { dayOfWeek: 4, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false, minBookingHours: 1, maxBookingHours: 4 },
+  { dayOfWeek: 5, openHour: 8,  closeHour: 22, isOvernight: false, isClosed: false, minBookingHours: 1, maxBookingHours: 4 },
+  { dayOfWeek: 6, openHour: 8,  closeHour: 46, isOvernight: true,  isClosed: false, minBookingHours: 1, maxBookingHours: 6 },
 ];
 
 async function verifyAdmin() {
@@ -59,26 +59,32 @@ export async function PUT(req) {
     const updates = Array.isArray(body) ? body : [body];
 
     const results = await Promise.all(
-      updates.map(async ({ dayOfWeek, openHour, closeHour, isOvernight, isClosed }) => {
-        // Validate
+      updates.map(async ({ dayOfWeek, openHour, closeHour, isOvernight, isClosed, minBookingHours, maxBookingHours }) => {
         if (dayOfWeek < 0 || dayOfWeek > 6) throw new Error(`Invalid dayOfWeek: ${dayOfWeek}`);
         if (!isClosed && (openHour < 0 || openHour > 23)) throw new Error("openHour must be 0–23");
         if (!isClosed && (closeHour < 1 || closeHour > 47)) throw new Error("closeHour must be 1–47");
 
+        const minH = Number(minBookingHours) || 1;
+        const maxH = Number(maxBookingHours) || 4;
+
         return prisma.operatingHours.upsert({
           where: { dayOfWeek },
           update: {
-            openHour: isClosed ? 8 : Number(openHour),
-            closeHour: isClosed ? 22 : Number(closeHour),
-            isOvernight: Boolean(isOvernight),
-            isClosed: Boolean(isClosed),
+            openHour:        isClosed ? 8 : Number(openHour),
+            closeHour:       isClosed ? 22 : Number(closeHour),
+            isOvernight:     Boolean(isOvernight),
+            isClosed:        Boolean(isClosed),
+            minBookingHours: minH,
+            maxBookingHours: maxH,
           },
           create: {
-            dayOfWeek: Number(dayOfWeek),
-            openHour: isClosed ? 8 : Number(openHour),
-            closeHour: isClosed ? 22 : Number(closeHour),
-            isOvernight: Boolean(isOvernight),
-            isClosed: Boolean(isClosed),
+            dayOfWeek:       Number(dayOfWeek),
+            openHour:        isClosed ? 8 : Number(openHour),
+            closeHour:       isClosed ? 22 : Number(closeHour),
+            isOvernight:     Boolean(isOvernight),
+            isClosed:        Boolean(isClosed),
+            minBookingHours: minH,
+            maxBookingHours: maxH,
           },
         });
       })

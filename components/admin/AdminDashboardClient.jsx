@@ -30,11 +30,13 @@ export default function AdminDashboardClient({
 
   // ── Operating Hours State ────────────────────────────────────────────────
   const defaultHours = Array.from({ length: 7 }, (_, i) => ({
-    dayOfWeek: i,
-    openHour: 8,
-    closeHour: i === 6 ? 46 : 22,
-    isOvernight: i === 6,
-    isClosed: i === 0,
+    dayOfWeek:       i,
+    openHour:        8,
+    closeHour:       i === 6 ? 46 : 22,
+    isOvernight:     i === 6,
+    isClosed:        i === 0,
+    minBookingHours: 1,
+    maxBookingHours: i === 6 ? 6 : 4,
   }));
   const [hours, setHours] = useState(
     initialHours?.length === 7 ? initialHours : defaultHours
@@ -62,6 +64,9 @@ export default function AdminDashboardClient({
   const [stRate, setStRate] = useState("150");
   const [stSpecs, setStSpecs] = useState("RTX 4080, i9-14900K, 32GB DDR5, 240Hz OLED");
   const [stIsActive, setStIsActive] = useState(true);
+  const [stMinPlayers, setStMinPlayers] = useState(1);
+  const [stMaxPlayers, setStMaxPlayers] = useState(1);
+  const [stExtraFee, setStExtraFee] = useState(0);
 
   const [statusMsg, setStatusMsg] = useState("");
 
@@ -128,7 +133,7 @@ export default function AdminDashboardClient({
         const res = await fetch("/api/stations", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: editingStationId, name: stName, type: stType, hourlyRate: stRate, specs: stSpecs, isActive: stIsActive }),
+          body: JSON.stringify({ id: editingStationId, name: stName, type: stType, hourlyRate: stRate, specs: stSpecs, isActive: stIsActive, minPlayers: stMinPlayers, maxPlayers: stMaxPlayers, extraPlayerFee: stExtraFee }),
         });
         const updated = await res.json();
         if (!res.ok) throw new Error(updated.error || "Failed to update station");
@@ -139,7 +144,7 @@ export default function AdminDashboardClient({
         const res = await fetch("/api/stations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: stName, type: stType, hourlyRate: stRate, specs: stSpecs, isActive: stIsActive }),
+          body: JSON.stringify({ name: stName, type: stType, hourlyRate: stRate, specs: stSpecs, isActive: stIsActive, minPlayers: stMinPlayers, maxPlayers: stMaxPlayers, extraPlayerFee: stExtraFee }),
         });
         const newStation = await res.json();
         if (!res.ok) throw new Error(newStation.error || "Failed to create station");
@@ -161,11 +166,15 @@ export default function AdminDashboardClient({
     setStRate(station.hourlyRate);
     setStSpecs(Array.isArray(station.specs) ? station.specs.join(", ") : "");
     setStIsActive(station.isActive !== false);
+    setStMinPlayers(station.minPlayers ?? 1);
+    setStMaxPlayers(station.maxPlayers ?? 1);
+    setStExtraFee(station.extraPlayerFee ?? 0);
   };
 
   const resetStationForm = () => {
     setEditingStationId(null);
     setStName(""); setStType("PC"); setStRate("150"); setStSpecs(""); setStIsActive(true);
+    setStMinPlayers(1); setStMaxPlayers(1); setStExtraFee(0);
   };
 
   const handleDeleteStation = async (id, name) => {
@@ -487,6 +496,21 @@ export default function AdminDashboardClient({
                 <input type="number" required min="0" value={stRate} onChange={(e) => setStRate(e.target.value)} placeholder="150" className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-xs mt-1" />
               </div>
             </div>
+            {/* Player Capacity */}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Min Players</label>
+                <input type="number" min="1" max="20" value={stMinPlayers} onChange={(e) => setStMinPlayers(Number(e.target.value))} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-xs mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Max Players</label>
+                <input type="number" min="1" max="20" value={stMaxPlayers} onChange={(e) => setStMaxPlayers(Number(e.target.value))} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-xs mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Extra/Player (₹/hr)</label>
+                <input type="number" min="0" value={stExtraFee} onChange={(e) => setStExtraFee(Number(e.target.value))} placeholder="0" className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-xs mt-1" />
+              </div>
+            </div>
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase">Hardware Specs (Comma Separated)</label>
               <input type="text" value={stSpecs} onChange={(e) => setStSpecs(e.target.value)} placeholder="e.g., RTX 4090, i9-14900K, 240Hz OLED" className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white text-sm mt-1" />
@@ -561,12 +585,13 @@ export default function AdminDashboardClient({
 
           <div className="glass-panel rounded-2xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-gray-900/60 border-b border-gray-800 text-[11px] font-bold uppercase text-gray-400 tracking-wider">
+            <div className="grid grid-cols-16 gap-2 px-6 py-3 bg-gray-900/60 border-b border-gray-800 text-[11px] font-bold uppercase text-gray-400 tracking-wider" style={{gridTemplateColumns: 'repeat(16, minmax(0, 1fr))' }}>
               <div className="col-span-2">Day</div>
               <div className="col-span-2">Status</div>
               <div className="col-span-2">Opens At</div>
-              <div className="col-span-3">Closes At</div>
-              <div className="col-span-3">Overnight Session</div>
+              <div className="col-span-2">Closes At</div>
+              <div className="col-span-3">Overnight</div>
+              <div className="col-span-5">Min / Max Booking</div>
             </div>
 
             {/* Day Rows */}
@@ -575,9 +600,10 @@ export default function AdminDashboardClient({
               return (
                 <div
                   key={day.dayOfWeek}
-                  className={`grid grid-cols-12 gap-2 px-6 py-4 border-b border-gray-800/50 items-center transition-colors ${
+                  className={`grid gap-2 px-6 py-4 border-b border-gray-800/50 items-center transition-colors ${
                     isClosedDay ? "opacity-60" : "hover:bg-gray-800/20"
                   }`}
+                  style={{ gridTemplateColumns: 'repeat(16, minmax(0, 1fr))' }}
                 >
                   {/* Day Name */}
                   <div className="col-span-2">
@@ -616,8 +642,8 @@ export default function AdminDashboardClient({
                     </select>
                   </div>
 
-                  {/* Close Hour (supports up to 47 for overnight) */}
-                  <div className="col-span-3">
+                  {/* Close Hour */}
+                  <div className="col-span-2">
                     <select
                       id={`hours-close-${day.dayOfWeek}`}
                       disabled={isClosedDay}
@@ -625,7 +651,6 @@ export default function AdminDashboardClient({
                       onChange={(e) => {
                         const val = Number(e.target.value);
                         updateDayHours(day.dayOfWeek, "closeHour", val);
-                        // Auto-enable overnight if close > 23
                         if (val > 23) updateDayHours(day.dayOfWeek, "isOvernight", true);
                         else updateDayHours(day.dayOfWeek, "isOvernight", false);
                       }}
@@ -660,6 +685,37 @@ export default function AdminDashboardClient({
                         {isClosedDay ? "—" : "Same day close"}
                       </span>
                     )}
+                  </div>
+
+                  {/* Min / Max Booking Hours */}
+                  <div className="col-span-5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[9px] text-gray-500 uppercase">Min</span>
+                        <div className="flex items-center gap-0.5">
+                          <button type="button" disabled={isClosedDay || (day.minBookingHours ?? 1) <= 0.5}
+                            onClick={() => updateDayHours(day.dayOfWeek, "minBookingHours", Math.max(0.5, (day.minBookingHours ?? 1) - 0.5))}
+                            className="w-6 h-6 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center">−</button>
+                          <span className="w-9 text-center text-xs font-mono text-white">{(day.minBookingHours ?? 1)}h</span>
+                          <button type="button" disabled={isClosedDay || (day.minBookingHours ?? 1) >= (day.maxBookingHours ?? 4)}
+                            onClick={() => updateDayHours(day.dayOfWeek, "minBookingHours", Math.min(day.maxBookingHours ?? 4, (day.minBookingHours ?? 1) + 0.5))}
+                            className="w-6 h-6 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center">+</button>
+                        </div>
+                      </div>
+                      <span className="text-gray-700 text-sm">│</span>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[9px] text-gray-500 uppercase">Max</span>
+                        <div className="flex items-center gap-0.5">
+                          <button type="button" disabled={isClosedDay || (day.maxBookingHours ?? 4) <= (day.minBookingHours ?? 1)}
+                            onClick={() => updateDayHours(day.dayOfWeek, "maxBookingHours", Math.max(day.minBookingHours ?? 1, (day.maxBookingHours ?? 4) - 0.5))}
+                            className="w-6 h-6 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center">−</button>
+                          <span className="w-9 text-center text-xs font-mono text-white">{(day.maxBookingHours ?? 4)}h</span>
+                          <button type="button" disabled={isClosedDay || (day.maxBookingHours ?? 4) >= 12}
+                            onClick={() => updateDayHours(day.dayOfWeek, "maxBookingHours", Math.min(12, (day.maxBookingHours ?? 4) + 0.5))}
+                            className="w-6 h-6 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center">+</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

@@ -17,15 +17,18 @@ const timeToMinutes = (timeStr) => {
 const hourToTimeStr = (h) => `${String(h).padStart(2, "0")}:00`;
 
 /**
- * Convert an extended hour (may be > 23) to a human-readable label.
- * e.g. 8 → "8:00 AM", 26 → "2:00 AM (Next Day)", 46 → "10:00 PM (Next Day)"
+ * Convert an extended hour to a human-readable label.
+ * @param {number}  hour           - Raw hour value (may be > 23 for overnight slots)
+ * @param {boolean} showNextDay    - When false, suppresses "(Next Day)" suffix.
+ *                                   Use false for continuation slots viewed from the
+ *                                   customer's selected date (they ARE that day's times).
  */
-const formatDisplayTime = (hour) => {
-  const realHour = hour % 24;
+const formatDisplayTime = (hour, showNextDay = true) => {
+  const realHour  = hour % 24;
   const isNextDay = hour >= 24;
-  const period = realHour < 12 ? "AM" : "PM";
+  const period    = realHour < 12 ? "AM" : "PM";
   const display12 = realHour % 12 === 0 ? 12 : realHour % 12;
-  return `${display12}:00 ${period}${isNextDay ? " (Next Day)" : ""}`;
+  return `${display12}:00 ${period}${(isNextDay && showNextDay) ? " (Next Day)" : ""}`;
 };
 
 /** Get YYYY-MM-DD string for a Date offset by `daysDelta`. */
@@ -143,9 +146,10 @@ export async function GET(req) {
             endTime,
             durationHours: duration,
             isAvailable: !booked,
-            bookingDate: prevDate,          // booking is stored under prev-day date
-            displayStartTime: formatDisplayTime(h),
-            displayEndTime:   formatDisplayTime(h + duration),
+            bookingDate: prevDate,
+            // showNextDay=false: from the customer's Sunday view these are plain Sunday times
+            displayStartTime: formatDisplayTime(h, false),
+            displayEndTime:   formatDisplayTime(h + duration, false),
             isOvernightContinuation: true,
           });
         }
@@ -153,7 +157,10 @@ export async function GET(req) {
     }
 
     // ── GROUP B: Today's own slots ────────────────────────────────────────────
-    if (!today.isClosed) {
+    // Skip if the previous day was overnight — that session's continuation (Group A)
+    // already covers today's entire window. Generating Group B too would produce
+    // duplicate slots for any overlapping hours (e.g. 8 AM–10 PM shown twice).
+    if (!today.isClosed && !isPrevOvernight) {
       const now = new Date();
       const todayBookings = await prisma.booking.findMany({
         where: {
@@ -201,9 +208,11 @@ export async function GET(req) {
       durationHours: duration,
       isClosed: false,
       operatingHours: {
-        openHour: today.openHour,
-        closeHour: today.closeHour,
-        isOvernight: today.isOvernight,
+        openHour:        today.openHour,
+        closeHour:       today.closeHour,
+        isOvernight:     today.isOvernight,
+        minBookingHours: today.minBookingHours ?? 1,
+        maxBookingHours: today.maxBookingHours ?? 4,
       },
       slots: slotGroups,
     });

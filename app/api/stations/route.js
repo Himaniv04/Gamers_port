@@ -9,6 +9,9 @@ const defaultStations = [
     type: "PC",
     specs: ["RTX 4090", "i9-14900K", "32GB DDR5", "240Hz OLED"],
     hourlyRate: 200,
+    minPlayers: 1,
+    maxPlayers: 2,
+    extraPlayerFee: 80,
     isActive: true,
   },
   {
@@ -16,6 +19,9 @@ const defaultStations = [
     type: "PC",
     specs: ["RTX 4080", "i7-13700K", "32GB DDR5", "240Hz OLED"],
     hourlyRate: 150,
+    minPlayers: 1,
+    maxPlayers: 2,
+    extraPlayerFee: 60,
     isActive: true,
   },
   {
@@ -23,6 +29,9 @@ const defaultStations = [
     type: "CONSOLE",
     specs: ["PlayStation 5", "55 inch 4K OLED", "DualSense Edge"],
     hourlyRate: 180,
+    minPlayers: 1,
+    maxPlayers: 4,
+    extraPlayerFee: 50,
     isActive: true,
   },
   {
@@ -30,6 +39,9 @@ const defaultStations = [
     type: "CONSOLE",
     specs: ["PlayStation 5", "55 inch 4K OLED", "DualSense Edge"],
     hourlyRate: 180,
+    minPlayers: 1,
+    maxPlayers: 4,
+    extraPlayerFee: 50,
     isActive: true,
   },
   {
@@ -37,6 +49,9 @@ const defaultStations = [
     type: "VR",
     specs: ["Meta Quest 3 512GB", "Haptic Racing Seat", "Wi-Fi 6E"],
     hourlyRate: 250,
+    minPlayers: 1,
+    maxPlayers: 1,
+    extraPlayerFee: 0,
     isActive: true,
   },
 ];
@@ -92,7 +107,7 @@ export async function POST(req) {
       return NextResponse.json(created, { status: 201 });
     }
 
-    const { name, type, specs, hourlyRate, isActive } = body;
+    const { name, type, specs, hourlyRate, isActive, minPlayers, maxPlayers, extraPlayerFee } = body;
 
     if (!name || !hourlyRate) {
       return NextResponse.json(
@@ -112,6 +127,9 @@ export async function POST(req) {
               .map((s) => s.trim())
               .filter(Boolean),
         hourlyRate: Number(hourlyRate),
+        minPlayers: minPlayers !== undefined ? Number(minPlayers) : 1,
+        maxPlayers: maxPlayers !== undefined ? Number(maxPlayers) : 1,
+        extraPlayerFee: extraPlayerFee !== undefined ? Number(extraPlayerFee) : 0,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
     });
@@ -129,7 +147,7 @@ export async function POST(req) {
 export async function PUT(req) {
   try {
     const body = await req.json();
-    const { id, name, type, specs, hourlyRate, isActive } = body;
+    const { id, name, type, specs, hourlyRate, isActive, minPlayers, maxPlayers, extraPlayerFee } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Station ID is required for update" }, { status: 400 });
@@ -140,6 +158,9 @@ export async function PUT(req) {
     if (type !== undefined) updateData.type = type;
     if (hourlyRate !== undefined) updateData.hourlyRate = Number(hourlyRate);
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+    if (minPlayers !== undefined) updateData.minPlayers = Number(minPlayers);
+    if (maxPlayers !== undefined) updateData.maxPlayers = Number(maxPlayers);
+    if (extraPlayerFee !== undefined) updateData.extraPlayerFee = Number(extraPlayerFee);
     if (specs !== undefined) {
       updateData.specs = Array.isArray(specs)
         ? specs
