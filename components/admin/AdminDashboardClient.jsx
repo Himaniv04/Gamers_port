@@ -70,6 +70,21 @@ export default function AdminDashboardClient({
 
   const [statusMsg, setStatusMsg] = useState("");
 
+  // ── Manual Booking States ────────────────────────────────────────────────
+  const [mbStationId, setMbStationId] = useState("");
+  const [mbDate, setMbDate] = useState(new Date().toISOString().split("T")[0]);
+  const [mbStartHour, setMbStartHour] = useState("8");
+  const [mbDuration, setMbDuration] = useState("1");
+  const [mbPlayers, setMbPlayers] = useState("1");
+  const [mbUserName, setMbUserName] = useState("");
+  const [mbUserEmail, setMbUserEmail] = useState("");
+  const [mbUserPhone, setMbUserPhone] = useState("");
+  const [mbCustomAmount, setMbCustomAmount] = useState("");
+  const [mbForceCreate, setMbForceCreate] = useState(false);
+  const [mbStatusMsg, setMbStatusMsg] = useState("");
+  const [mbErrorMsg, setMbErrorMsg] = useState("");
+  const [isCreatingMb, setIsCreatingMb] = useState(false);
+
   // ── Hours Tab Helpers ────────────────────────────────────────────────────
   const updateDayHours = (dayOfWeek, field, value) => {
     setHours((prev) =>
@@ -265,6 +280,79 @@ export default function AdminDashboardClient({
     } catch (err) { console.error(err); }
   };
 
+  // ── Booking Handlers ─────────────────────────────────────────────────────
+  const handleCreateManualBooking = async (e) => {
+    e.preventDefault();
+    setIsCreatingMb(true);
+    setMbStatusMsg("");
+    setMbErrorMsg("");
+    
+    // Auto-select first station if none selected
+    const stationIdToUse = mbStationId || (stations.length > 0 ? stations[0].id : "");
+    if (!stationIdToUse) {
+      setMbErrorMsg("No station available");
+      setIsCreatingMb(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stationId: stationIdToUse,
+          bookingDate: mbDate,
+          startHour: mbStartHour,
+          durationHours: mbDuration,
+          playerCount: mbPlayers,
+          userName: mbUserName,
+          userEmail: mbUserEmail,
+          userPhone: mbUserPhone,
+          customAmount: mbCustomAmount,
+          forceCreate: mbForceCreate,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.hasConflict) {
+          setMbErrorMsg(data.message);
+        } else {
+          setMbErrorMsg(data.error || "Failed to create booking");
+        }
+        return;
+      }
+      setBookings([data, ...bookings]);
+      setMbStatusMsg("Manual booking created successfully!");
+      setMbUserName(""); setMbUserEmail(""); setMbUserPhone(""); setMbCustomAmount(""); setMbForceCreate(false);
+    } catch (error) {
+      setMbErrorMsg("Network error.");
+    } finally {
+      setIsCreatingMb(false);
+      setTimeout(() => setMbStatusMsg(""), 3000);
+    }
+  };
+
+  const handleUpdateBookingStatus = async (id, status) => {
+    try {
+      const res = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setBookings(bookings.map((b) => (b.id === id ? updated : b)));
+        setStatusMsg("Booking status updated!");
+        setTimeout(() => setStatusMsg(""), 3000);
+      } else {
+        const data = await res.json();
+        setStatusMsg(data.error || "Failed to update status");
+      }
+    } catch {
+      setStatusMsg("Network error");
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* HEADER */}
@@ -313,8 +401,73 @@ export default function AdminDashboardClient({
 
       {/* ── TAB: BOOKINGS ─────────────────────────────────────────────────────── */}
       {activeTab === "bookings" && (
-        <div className="glass-panel p-6 rounded-2xl space-y-6">
-          <h2 className="text-xl font-bold text-white">All Customer Bookings</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Manual Booking Form */}
+          <form onSubmit={handleCreateManualBooking} className="glass-panel p-6 rounded-2xl space-y-4 h-fit">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Plus className="w-5 h-5 text-cyan-400" /> Manual Booking
+            </h2>
+            {mbErrorMsg && <div className="text-red-400 text-xs">{mbErrorMsg}</div>}
+            {mbStatusMsg && <div className="text-emerald-400 text-xs">{mbStatusMsg}</div>}
+            
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Station</label>
+                <select value={mbStationId} onChange={(e) => setMbStationId(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-white text-sm mt-1">
+                  {stations.map(s => <option key={s.id} value={s.id}>{s.name} ({s.type})</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Date</label>
+                  <input type="date" value={mbDate} onChange={(e) => setMbDate(e.target.value)} required className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Start (0-23)</label>
+                  <input type="number" min="0" max="23" value={mbStartHour} onChange={(e) => setMbStartHour(e.target.value)} required className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm mt-1" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Duration (h)</label>
+                  <input type="number" step="0.5" min="0.5" value={mbDuration} onChange={(e) => setMbDuration(e.target.value)} required className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Players</label>
+                  <input type="number" min="1" value={mbPlayers} onChange={(e) => setMbPlayers(e.target.value)} required className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm mt-1" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Customer Name</label>
+                <input type="text" value={mbUserName} onChange={(e) => setMbUserName(e.target.value)} required placeholder="Name" className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-white text-sm mt-1" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Email</label>
+                  <input type="email" value={mbUserEmail} onChange={(e) => setMbUserEmail(e.target.value)} required placeholder="Email" className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Phone</label>
+                  <input type="text" value={mbUserPhone} onChange={(e) => setMbUserPhone(e.target.value)} required placeholder="Phone" className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm mt-1" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase">Custom Amount (₹) - Optional</label>
+                <input type="number" value={mbCustomAmount} onChange={(e) => setMbCustomAmount(e.target.value)} placeholder="Auto-calculated if empty" className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-white text-sm mt-1" />
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <input type="checkbox" id="forceCreate" checked={mbForceCreate} onChange={(e) => setMbForceCreate(e.target.checked)} className="w-4 h-4 rounded bg-gray-900 border-gray-800 text-cyan-400 focus:ring-0" />
+                <label htmlFor="forceCreate" className="text-xs font-bold text-gray-300">Force Create (Ignore slot conflicts)</label>
+              </div>
+            </div>
+            <button type="submit" disabled={isCreatingMb} className="w-full py-3 mt-4 rounded-xl font-bold font-display bg-cyan-500 text-black hover:bg-cyan-400 transition-all disabled:opacity-50">
+              {isCreatingMb ? "Booking..." : "Create Booking"}
+            </button>
+          </form>
+
+          {/* Bookings Table */}
+          <div className="glass-panel p-6 rounded-2xl space-y-6 lg:col-span-2">
+            <h2 className="text-xl font-bold text-white">All Customer Bookings</h2>
           {bookings.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left font-mono text-xs">
@@ -340,15 +493,24 @@ export default function AdminDashboardClient({
                       <td className="py-3.5 px-4 text-white font-bold">{b.startTime} – {b.endTime}</td>
                       <td className="py-3.5 px-4 text-emerald-400 font-bold">₹{b.totalAmount}</td>
                       <td className="py-3.5 px-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          b.status === "CONFIRMED"
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                            : b.status === "PENDING"
-                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                            : "bg-red-500/20 text-red-400 border border-red-500/30"
-                        }`}>
-                          {b.status}
-                        </span>
+                        <select
+                          value={b.status}
+                          onChange={(e) => handleUpdateBookingStatus(b.id, e.target.value)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold border outline-none cursor-pointer ${
+                            b.status === "CONFIRMED"
+                              ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                              : b.status === "PENDING"
+                              ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                              : b.status === "CANCELLED"
+                              ? "bg-red-500/20 text-red-400 border-red-500/30"
+                              : "bg-gray-800 text-gray-400 border-gray-700"
+                          }`}
+                        >
+                          <option value="PENDING" className="bg-gray-900 text-amber-400">PENDING</option>
+                          <option value="CONFIRMED" className="bg-gray-900 text-emerald-400">CONFIRMED</option>
+                          <option value="CANCELLED" className="bg-gray-900 text-red-400">CANCELLED</option>
+                          <option value="EXPIRED" className="bg-gray-900 text-gray-400">EXPIRED</option>
+                        </select>
                       </td>
                     </tr>
                   ))}
@@ -358,6 +520,7 @@ export default function AdminDashboardClient({
           ) : (
             <div className="text-center py-12 text-gray-400">No customer bookings found.</div>
           )}
+          </div>
         </div>
       )}
 
