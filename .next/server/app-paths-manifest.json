@@ -1,8 +1,7 @@
 {
+  "/admin/page": "app/admin/page.js",
   "/page": "app/page.js",
-  "/book-slot/page": "app/book-slot/page.js",
-  "/api/stations/route": "app/api/stations/route.js",
   "/api/slots/available/route": "app/api/slots/available/route.js",
-  "/api/admin/operating-hours/route": "app/api/admin/operating-hours/route.js",
-  "/admin/page": "app/admin/page.js"
+  "/api/stations/route": "app/api/stations/route.js",
+  "/book-slot/page": "app/book-slot/page.js"
 }
