@@ -52,6 +52,41 @@ async function expireStaleBookings() {
   });
 }
 
+/**
+ * Checks if a proposed slot leaves an unbookable gap (e.g. 30 mins) before or after it.
+ * @param {number} slotStartMin 
+ * @param {number} slotEndMin 
+ * @param {Array} bookings 
+ * @param {number} windowStartMin 
+ * @param {number} windowEndMin 
+ * @param {number} minBookingMin 
+ * @returns {boolean}
+ */
+function createsWastedGap(slotStartMin, slotEndMin, bookings, windowStartMin, windowEndMin, minBookingMin) {
+  let maxPrevEnd = windowStartMin;
+  let minNextStart = windowEndMin;
+
+  for (const b of bookings) {
+    const bStart = timeToMinutes(b.startTime);
+    const bEnd = timeToMinutes(b.endTime);
+
+    if (bEnd <= slotStartMin && bEnd > maxPrevEnd) {
+      maxPrevEnd = bEnd;
+    }
+    if (bStart >= slotEndMin && bStart < minNextStart) {
+      minNextStart = bStart;
+    }
+  }
+
+  const gapBefore = slotStartMin - maxPrevEnd;
+  const gapAfter = minNextStart - slotEndMin;
+
+  if (gapBefore > 0 && gapBefore < minBookingMin) return true;
+  if (gapAfter > 0 && gapAfter < minBookingMin) return true;
+
+  return false;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/slots/available?date=YYYY-MM-DD&stationId=N&duration=1
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,6 +178,16 @@ export async function GET(req) {
             return slotStartMin < bEnd && slotEndMin > bStart;
           });
 
+          let isAvailable = !booked;
+          if (isAvailable) {
+            const windowStartMin = contStart * 60;
+            const windowEndMin = contEnd * 60;
+            const minBookingMin = (today.minBookingHours ?? 1) * 60;
+            if (createsWastedGap(slotStartMin, slotEndMin, prevBookings, windowStartMin, windowEndMin, minBookingMin)) {
+              isAvailable = false;
+            }
+          }
+
           // Real-hour display relative to midnight
           const realStartHour = h - 24;
           const realEndHour   = h + duration - 24;
@@ -151,7 +196,7 @@ export async function GET(req) {
             startTime,   // internal extended: "24:00", "25:00", …
             endTime,
             durationHours: duration,
-            isAvailable: !booked,
+            isAvailable,
             bookingDate: prevDate,
             // showNextDay=false: from the customer's Sunday view these are plain Sunday times
             displayStartTime: formatDisplayTime(h, false),
@@ -195,11 +240,21 @@ export async function GET(req) {
           return slotStartMin < bEnd && slotEndMin > bStart;
         });
 
+        let isAvailable = !booked;
+        if (isAvailable) {
+          const windowStartMin = ownStart * 60;
+          const windowEndMin = ownEnd * 60;
+          const minBookingMin = (today.minBookingHours ?? 1) * 60;
+          if (createsWastedGap(slotStartMin, slotEndMin, todayBookings, windowStartMin, windowEndMin, minBookingMin)) {
+            isAvailable = false;
+          }
+        }
+
         slotGroups.push({
           startTime,
           endTime,
           durationHours: duration,
-          isAvailable: !booked,
+          isAvailable,
           bookingDate: date,
           displayStartTime: formatDisplayTime(h),
           displayEndTime:   formatDisplayTime(h + duration),

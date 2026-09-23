@@ -97,6 +97,41 @@ export async function POST(req) {
       );
     }
 
+    // Gap validation to prevent stranded time slots
+    const dateObj = new Date(bookingDate + "T00:00:00Z");
+    const dayOfWeek = dateObj.getUTCDay();
+    const todayHours = await prisma.operatingHours.findUnique({ where: { dayOfWeek } });
+    const today = todayHours ?? { openHour: 8, closeHour: 22, minBookingHours: 1 };
+
+    const windowStartMin = today.openHour * 60;
+    const windowEndMin = today.closeHour * 60;
+    const minBookingMin = (today.minBookingHours ?? 1) * 60;
+
+    let maxPrevEnd = windowStartMin;
+    let minNextStart = windowEndMin;
+
+    for (const b of existingConflicts) {
+      const bStart = timeToMinutes(b.startTime);
+      const bEnd = timeToMinutes(b.endTime);
+
+      if (bEnd <= requestedStart && bEnd > maxPrevEnd) {
+        maxPrevEnd = bEnd;
+      }
+      if (bStart >= requestedEnd && bStart < minNextStart) {
+        minNextStart = bStart;
+      }
+    }
+
+    const gapBefore = requestedStart - maxPrevEnd;
+    const gapAfter = minNextStart - requestedEnd;
+
+    if ((gapBefore > 0 && gapBefore < minBookingMin) || (gapAfter > 0 && gapAfter < minBookingMin)) {
+      return NextResponse.json(
+        { error: "Booking leaves an unbookable time gap. Please select an adjacent slot." },
+        { status: 409 }
+      );
+    }
+
     const lockExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10-min lock
     const duration = Number(durationHours) || 1;
 

@@ -88,6 +88,42 @@ export async function POST(req) {
           message: `Overlaps with ${conflict.userName}'s booking (${conflict.startTime}–${conflict.endTime}). Enable "Force Create" to override.`,
         }, { status: 409 });
       }
+
+      // Gap validation
+      const dateObj = new Date(bookingDate + "T00:00:00Z");
+      const dayOfWeek = dateObj.getUTCDay();
+      const todayHours = await prisma.operatingHours.findUnique({ where: { dayOfWeek } });
+      const today = todayHours ?? { openHour: 8, closeHour: 22, minBookingHours: 1 };
+  
+      const windowStartMin = today.openHour * 60;
+      const windowEndMin = today.closeHour * 60;
+      const minBookingMin = (today.minBookingHours ?? 1) * 60;
+  
+      let maxPrevEnd = windowStartMin;
+      let minNextStart = windowEndMin;
+  
+      for (const b of existing) {
+        const bStart = timeToMinutes(b.startTime);
+        const bEnd = timeToMinutes(b.endTime);
+  
+        if (bEnd <= reqStart && bEnd > maxPrevEnd) {
+          maxPrevEnd = bEnd;
+        }
+        if (bStart >= reqEnd && bStart < minNextStart) {
+          minNextStart = bStart;
+        }
+      }
+  
+      const gapBefore = reqStart - maxPrevEnd;
+      const gapAfter = minNextStart - reqEnd;
+  
+      if ((gapBefore > 0 && gapBefore < minBookingMin) || (gapAfter > 0 && gapAfter < minBookingMin)) {
+        return NextResponse.json({
+          error: "Gap Warning",
+          hasConflict: true,
+          message: `Booking leaves an unbookable time gap (less than ${today.minBookingHours || 1} hr). Enable "Force Create" to override.`,
+        }, { status: 409 });
+      }
     }
 
     const players = Math.max(1, Number(playerCount));
