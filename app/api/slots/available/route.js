@@ -13,8 +13,12 @@ const timeToMinutes = (timeStr) => {
   return h * 60 + (m || 0);
 };
 
-/** Integer hour (may be > 23) → "HH:00" string. e.g. 26 → "26:00" */
-const hourToTimeStr = (h) => `${String(h).padStart(2, "0")}:00`;
+/** Decimal hour → "HH:MM" string. e.g. 9.5 → "09:30", 26.5 → "26:30" */
+const hourToTimeStr = (h) => {
+  const hr = Math.floor(h);
+  const min = Math.round((h - hr) * 60);
+  return `${String(hr).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+};
 
 /**
  * Convert an extended hour to a human-readable label.
@@ -24,11 +28,13 @@ const hourToTimeStr = (h) => `${String(h).padStart(2, "0")}:00`;
  *                                   customer's selected date (they ARE that day's times).
  */
 const formatDisplayTime = (hour, showNextDay = true) => {
-  const realHour  = hour % 24;
-  const isNextDay = hour >= 24;
+  const hr = Math.floor(hour);
+  const min = Math.round((hour - hr) * 60);
+  const realHour  = hr % 24;
+  const isNextDay = hr >= 24;
   const period    = realHour < 12 ? "AM" : "PM";
   const display12 = realHour % 12 === 0 ? 12 : realHour % 12;
-  return `${display12}:00 ${period}${(isNextDay && showNextDay) ? " (Next Day)" : ""}`;
+  return `${display12}:${String(min).padStart(2, "0")} ${period}${(isNextDay && showNextDay) ? " (Next Day)" : ""}`;
 };
 
 /** Get YYYY-MM-DD string for a Date offset by `daysDelta`. */
@@ -54,7 +60,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get("date");       // "YYYY-MM-DD"
     const stationId = searchParams.get("stationId");
-    const duration = parseInt(searchParams.get("duration") || "1", 10);
+    const duration = parseFloat(searchParams.get("duration") || "1");
 
     if (!date || !stationId) {
       return NextResponse.json(
@@ -124,7 +130,7 @@ export async function GET(req) {
           },
         });
 
-        for (let h = contStart; h <= contEnd - duration; h++) {
+        for (let h = contStart; h <= contEnd - duration; h += 0.5) {
           const startTime = hourToTimeStr(h);
           const endTime   = hourToTimeStr(h + duration);
 
@@ -176,7 +182,7 @@ export async function GET(req) {
       const ownStart = today.openHour;
       const ownEnd   = today.closeHour; // may be > 23 if today is also overnight
 
-      for (let h = ownStart; h <= ownEnd - duration; h++) {
+      for (let h = ownStart; h <= ownEnd - duration; h += 0.5) {
         const startTime = hourToTimeStr(h);
         const endTime   = hourToTimeStr(h + duration);
 
